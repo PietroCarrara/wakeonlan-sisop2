@@ -6,7 +6,7 @@
     "configurations": [
         {
             "name": "Debug Server",
-            "preLaunchTask": "${defaultBuildTask}",
+            "preLaunchTask": "Build",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/main",
@@ -17,7 +17,7 @@
         },
         {
             "name": "Debug Client",
-            "preLaunchTask": "${defaultBuildTask}",
+            "preLaunchTask": "Build",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/main",

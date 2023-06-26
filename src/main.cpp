@@ -1,3 +1,4 @@
+#include <chrono>
 #include <future>
 #include <iostream>
 #include <optional>
@@ -5,78 +6,114 @@
 #include <thread>
 #include <vector>
 
+#include "atomic.hpp"
+#include "channel.hpp"
+
 using namespace std;
 
-// Channel implementation
-template <class T>
-class Channel {
- private:
-  binary_semaphore senders = binary_semaphore{1};
-  binary_semaphore receivers = binary_semaphore{0};
-  bool is_open = true;
-  optional<T> data;
+struct None {};
 
- public:
-  void send(T to_send) {
-    senders.acquire();
-    if (!is_open) {
-      throw exception();
-    }
-
-    data = to_send;
-    receivers.release();
-  }
-
-  optional<T> receive() {
-    receivers.acquire();
-    if (!is_open) {
-      return {};
-    }
-
-    T result = data.value();
-    data = {};
-    senders.release();
-    return result;
-  }
-
-  void close() {
-    senders.acquire();
-    is_open = false;
-    data = {};
-    receivers.release();
-  }
+struct Participant {
+  string hostname;
+  string mac_address;
+  string ip_address;
+  chrono::time_point<chrono::system_clock> last_time_seen_alive;
 };
 
-void producer(Channel<int>& chan) {
-  for (int i = 0; i < 10; i++) {
-    cout << "Producing " << i << endl;
-    chan.send(i);
+struct ParticipantTable {
+  // The leader's MAC address. Empty if we haven't found it yet.
+  optional<string> leader_mac_address;
+  vector<Participant> participants;
+};
+
+enum struct MessageType {
+  Heartbeat,
+  WakeupRequest,
+  LookingForLeader,
+  IAmTheLeader
+};
+
+struct Message {
+  MessageType message_type;
+
+  // The machine we want to send the message to. Empty for
+  // broadcast (sending to entire network)
+  optional<Participant> target;
+};
+
+void message_sender(Channel<Message>& messages) {
+  while (auto msg = messages.receive()) {
+    // TODO: Encode message to destination via UDP
   }
-  cout << "Closing channel..." << endl;
-  chan.close();
 }
 
-void consumer(Channel<int>& chan) {
-  while (true) {
-    auto i = chan.receive();
+void message_receiver(Atomic<ParticipantTable>& table, Channel<None>& running) {
+  while (running.is_open()) {
+    // TODO: Decode the next message from UDP, check the type, update the table
 
-    if (!i.has_value()) {
-      cout << "Empty value read from channel, this means it is closed. "
-              "Stopping consumer..."
-           << endl;
-      return;
+    MessageType received;  // TODO: Get this from UDP
+
+    switch (received) {
+      case MessageType::IAmTheLeader:
+        // TODO: Get the mac address from the incoming socket message
+        table.with(
+            [&](ParticipantTable& table) { table.leader_mac_address = "..."; });
+        break;
+
+        // TODO: Handle the rest of the cases
+
+      default:
+        break;
     }
+  }
+}
 
-    cout << "Consuming " << i.value() << endl;
+void find_leader_mac(Atomic<ParticipantTable>& participants,
+                     Channel<Message>& messages) {
+  while (participants.compute([&](ParticipantTable& participants) {
+    return !participants.leader_mac_address.has_value();
+  })) {
+    messages.send(
+        Message{.message_type = MessageType::LookingForLeader, .target = {}});
+
+    // TODO: Maybe sleep a little?
+  }
+}
+
+void setup_leader(bool i_am_the_leader, Atomic<ParticipantTable>& participants,
+                  Channel<Message>& messages) {
+  if (i_am_the_leader) {
+    participants.with([&](ParticipantTable& participants) {
+      // TODO: Get our own mac address
+      participants.leader_mac_address = "00:00:00:00:00:00";
+    });
+  } else {
+    cout << "Looking for leader..." << endl;
+    async(&find_leader_mac, ref(participants), ref(messages)).wait();
   }
 }
 
 int main() {
-  Channel<int> chan;
+  bool i_am_the_leader = false;  // TODO: Get this from argv
 
-  auto prodThread = async(&producer, ref(chan));
-  auto consThread = async(&consumer, ref(chan));
+  Atomic<ParticipantTable> participants;
+  vector<future<void>> threads;
 
-  prodThread.wait();
-  consThread.wait();
+  Channel<None> running;
+  Channel<Message> messages;
+
+  // Spawn threads
+  threads.push_back(async(&message_sender, ref(messages)));
+  threads.push_back(async(&message_receiver, ref(participants), ref(running)));
+
+  setup_leader(i_am_the_leader, participants, messages);
+
+  // Close channels
+  running.close();
+  messages.close();
+
+  // Wait everyone
+  for (auto& thread : threads) {
+    thread.wait();
+  }
 }

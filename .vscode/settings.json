@@ -1,10 +1,13 @@
 {
-    "C_Cpp.default.cppStandard": "c++23",
-    "files.associations": {
-        "*.lud": "clojure",
-        "vector": "cpp",
-        "semaphore": "cpp",
-        "optional": "cpp"
-    },
-    "editor.tabSize": 2
+  "C_Cpp.clang_format_style": "Google",
+  "C_Cpp.default.cppStandard": "c++23",
+  "files.associations": {
+    "vector": "cpp",
+    "semaphore": "cpp",
+    "optional": "cpp",
+    "future": "cpp",
+    "thread": "cpp",
+    "ostream": "cpp"
+  },
+  "editor.tabSize": 2
 }

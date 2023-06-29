@@ -7,7 +7,9 @@
     "optional": "cpp",
     "future": "cpp",
     "thread": "cpp",
-    "ostream": "cpp"
+    "ostream": "cpp",
+    "stop_token": "cpp",
+    "functional": "cpp"
   },
-  "editor.tabSize": 2
+  "editor.tabSize": 4
 }

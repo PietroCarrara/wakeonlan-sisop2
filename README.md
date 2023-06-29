@@ -4,7 +4,9 @@ O auto-complete e o comando de compilação já estão configurados pro VSCode, 
 
 ### Rodando
 
-Pra compilar e rodar no braço, é só rodar `g++ -std=c++23 -g src/main.cpp -o main && ./main`, mas a build também está configurada pelo VSCode:
+Pra compilar no braço, basta rodar o comando `make`, ele irá compilar todos os arquivos e o resultado irá pasta build.
+Para rodar o programa, execute `make client` ou `make manager`
+Para limpar sua pasta de build, execute `make clear_build`
 
 Apertando F5, a IDE compila e roda o programa em modo de debug. Para mudar se você quer rodar o cliente ou o servidor, navegue até o menu de debugging e selecione a configuração desejada:
 
@@ -25,4 +27,4 @@ O projeto não vai ser um troço enorme, então isso são menos regras e mais su
 
 ## Separação em Arquivos
 
-Compilar projetos em C++ é uma merda. Pra evitar os traumas de tentar montar um sistema de build complexo, vamos tentar botar tudo no `main.cpp`. Se começar a complicar demais, a gente tenta configurar um Makefile (ou algum método mais fácil que eu não conheça).
+Todos os arquivos que não são a `main.cpp` devem conter um header (`exemplo.h`) com as definições de tipos e protótipos de funções, e um arquivo de código (`exemplo.c`) com essas implementações. **NOTA: FUNÇÕES COM TEMPLATE DEVEM FICAR NO .h!!!**

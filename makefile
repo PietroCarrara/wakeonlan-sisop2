@@ -1,20 +1,14 @@
 PROJECT = wakeonlan
 CC = g++
 CFLAGS = -Wall -std=c++23 -g
-MAIN = src/main.cpp
+SRC_FILES = src/*.cpp
 OUT_DIR = build
-
-OBJECTS = main.o
 
 all: $(PROJECT)
 
-# build app and clean *.o files
-$(PROJECT): $(OBJECTS)
-	$(CC) $(CFLAGS) -o $(OUT_DIR)/$(PROJECT) $(OBJECTS) && rm $(OBJECTS) 
-
-# build main.o file
-main.o: $(MAIN) 
-	$(CC) $(CFLAGS) -c $(MAIN)
+# build app
+$(PROJECT): 
+	$(CC) $(CFLAGS) -o $(OUT_DIR)/$(PROJECT) $(SRC_FILES)
 
 # --------------
 # RECIPES ONLY:

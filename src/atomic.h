@@ -10,6 +10,7 @@ class Atomic {
   T resource;
 
  public:
+  // Do something with the protected value and return something
   auto compute(auto&& callback) {
     lock.lock();
     auto res = callback(ref(resource));
@@ -17,6 +18,7 @@ class Atomic {
     return res;
   }
 
+  // Do something with the protected value but return nothing
   void with(function<void(T&)> callback) {
     lock.lock();
     callback(ref(resource));

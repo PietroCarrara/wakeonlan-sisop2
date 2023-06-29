@@ -6,8 +6,8 @@
 #include <thread>
 #include <vector>
 
-#include "atomic.hpp"
-#include "channel.hpp"
+#include "atomic.h"
+#include "channel.h"
 
 using namespace std;
 
@@ -95,11 +95,10 @@ void setup_leader(bool i_am_the_leader, Atomic<ParticipantTable>& participants,
 
 int main(int argc, char* argv[]) {
   bool i_am_the_leader = false;
-  
-  if(argc > 1)
-  {
+
+  if (argc > 1) {
     string arg = argv[1];
-    if(arg.compare("manager") == 0) i_am_the_leader = true;
+    if (arg.compare("manager") == 0) i_am_the_leader = true;
   }
 
   Atomic<ParticipantTable> participants;

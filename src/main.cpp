@@ -8,6 +8,7 @@
 
 #include "atomic.h"
 #include "channel.h"
+#include "socket.h"
 
 using namespace std;
 
@@ -99,6 +100,16 @@ int main(int argc, char* argv[]) {
   if (argc > 1) {
     string arg = argv[1];
     if (arg.compare("manager") == 0) i_am_the_leader = true;
+  }
+
+  Socket socket;
+  if (i_am_the_leader) {
+    socket.open();
+    auto sla = socket.receive();
+    cout << "dados: " << sla.data << "\nAddr: " << sla.ip << "\n";
+  } else {
+    socket.open();
+    socket.send("seloko pae :)", "127.0.0.1");
   }
 
   Atomic<ParticipantTable> participants;

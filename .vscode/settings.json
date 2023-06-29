@@ -9,7 +9,9 @@
     "thread": "cpp",
     "ostream": "cpp",
     "stop_token": "cpp",
-    "functional": "cpp"
+    "functional": "cpp",
+    "string": "cpp",
+    "*.tcc": "cpp"
   },
   "editor.tabSize": 4
 }

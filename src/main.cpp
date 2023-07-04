@@ -10,6 +10,8 @@
 #include "channel.h"
 #include "socket.h"
 
+constexpr Port APP_PORT = 5000;
+
 using namespace std;
 
 struct None {};
@@ -36,10 +38,8 @@ enum struct MessageType {
 
 struct Message {
   MessageType message_type;
-
-  // The machine we want to send the message to. Empty for
-  // broadcast (sending to entire network)
-  optional<Participant> target;
+  string ip;
+  int port;
 };
 
 void message_sender(Channel<Message>& messages) {
@@ -48,11 +48,11 @@ void message_sender(Channel<Message>& messages) {
   }
 }
 
-void message_receiver(Atomic<ParticipantTable>& table, Channel<None>& running) {
+void message_receiver(Atomic<ParticipantTable>& table, Channel<None>& running, Socket& socket) {
   while (running.is_open()) {
-    // TODO: Decode the next message from UDP, check the type, update the table
+    auto msg = socket.receive(); // TODO: Decode the next message from UDP, check the type, update the table
 
-    MessageType received;  // TODO: Get this from UDP
+    MessageType received;  // TODO: Decode this from UDP
 
     switch (received) {
       case MessageType::IAmTheLeader:
@@ -75,7 +75,7 @@ void find_leader_mac(Atomic<ParticipantTable>& participants,
     return !participants.leader_mac_address.has_value();
   })) {
     messages.send(
-        Message{.message_type = MessageType::LookingForLeader, .target = {}});
+        Message{.message_type = MessageType::LookingForLeader, .ip = "255.255.255", .port = APP_PORT });
 
     // TODO: Maybe sleep a little?
   }
@@ -103,13 +103,9 @@ int main(int argc, char* argv[]) {
   }
 
   Socket socket;
+  socket.open(APP_PORT);
   if (i_am_the_leader) {
-    socket.open();
-    auto sla = socket.receive();
-    cout << "dados: " << sla.data << "\nAddr: " << sla.ip << "\n";
-  } else {
-    socket.open();
-    socket.send("seloko pae :)", "127.0.0.1");
+    socket.send("");
   }
 
   Atomic<ParticipantTable> participants;
@@ -120,7 +116,7 @@ int main(int argc, char* argv[]) {
 
   // Spawn threads
   threads.push_back(async(&message_sender, ref(messages)));
-  threads.push_back(async(&message_receiver, ref(participants), ref(running)));
+  threads.push_back(async(&message_receiver, ref(participants), ref(running), ref(socket)));
 
   setup_leader(i_am_the_leader, participants, messages);
 

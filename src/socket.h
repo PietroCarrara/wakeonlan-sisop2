@@ -13,7 +13,7 @@
 
 #include <iostream>
 
-constexpr uint16_t APP_PORT = 5000;
+typedef uint16_t Port;
 constexpr size_t BUFFER_SIZE = 256;
 
 using namespace std;
@@ -28,14 +28,14 @@ class Socket {
   int socket_file_descriptor;
 
  public:
-  void open() {
+  void open(Port port) {
     struct sockaddr_in server_address;
 
     if ((socket_file_descriptor = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
       printf("*** Error opening socket ***");
 
     server_address.sin_family = AF_INET;
-    server_address.sin_port = htons(APP_PORT);
+    server_address.sin_port = htons(port);
     server_address.sin_addr.s_addr = INADDR_ANY;
     bzero(&(server_address.sin_zero), 8);
 
@@ -66,10 +66,10 @@ class Socket {
     return result;
   }
 
-  void send(string data, string ip) {
+  void send(string data, string ip, Port port) {
     const char *ip_c_str = ip.c_str();
     struct sockaddr_in recipient_address = {.sin_family = AF_INET,
-                                            .sin_port = htons(APP_PORT),
+                                            .sin_port = htons(port),
                                             .sin_addr = inet_addr(ip_c_str)};
 
     const char *bytes = data.c_str();

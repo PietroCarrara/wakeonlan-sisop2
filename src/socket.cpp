@@ -40,9 +40,10 @@ Datagram Socket::receive() {
 
 void Socket::send(string data, string ip, Port port) {
   const char *ip_c_str = ip.c_str();
+  struct in_addr in_address = {.s_addr = inet_addr(ip_c_str)};
   struct sockaddr_in recipient_address = {.sin_family = AF_INET,
                                           .sin_port = htons(port),
-                                          .sin_addr = inet_addr(ip_c_str)};
+                                          .sin_addr = in_address};
 
   const char *bytes = data.c_str();
   const int total_data_length = data.length() + 1;  // +1 because of '\0'
@@ -56,9 +57,10 @@ void Socket::send(string data, string ip, Port port) {
 
 void Socket::send_bytes(vector<byte> data, string ip, Port port) {
   const char *ip_c_str = ip.c_str();
+  struct in_addr in_address = {.s_addr = inet_addr(ip_c_str)};
   struct sockaddr_in recipient_address = {.sin_family = AF_INET,
                                           .sin_port = htons(port),
-                                          .sin_addr = inet_addr(ip_c_str)};
+                                          .sin_addr = in_address};
 
   byte* bytes = data.data();
   const int total_data_length = data.size();

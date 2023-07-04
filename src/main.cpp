@@ -3,6 +3,7 @@
 #include <iostream>
 #include <optional>
 #include <semaphore>
+#include <string>
 #include <thread>
 #include <vector>
 
@@ -39,22 +40,64 @@ enum struct MessageType {
 struct Message {
   MessageType message_type;
   string ip;
+  string mac_address;
   int port;
 };
 
-void message_sender(Channel<Message>& messages) {
-  while (auto msg = messages.receive()) {
-    // TODO: Encode message to destination via UDP
+Message decode_message(string data) {
+  if (data == "LookingForLeader") {
+    return Message {
+      .message_type = MessageType::LookingForLeader,
+    };
+  }
+
+  if (data == "IAmTheLeader") {
+    return Message {
+      .message_type = MessageType::IAmTheLeader,
+    };
   }
 }
 
-void message_receiver(Atomic<ParticipantTable>& table, Channel<None>& running, Socket& socket) {
+string encode_message(Message message) {
+  switch (message.message_type) {
+    case MessageType::LookingForLeader:
+      return "LookingForLeader";
+    case MessageType::IAmTheLeader:
+      return "IAmTheLeader";
+  }
+}
+
+void message_sender(Channel<Message>& messages, Socket& socket) {
+  while (auto msg_maybe = messages.receive()) {
+    auto msg = msg_maybe.value();
+    string data = encode_message(msg);
+    string wakeonlan_command = "wakeonlan " + msg.mac_address;
+
+    switch (msg.message_type) {
+      case MessageType::WakeupRequest:
+        // HACK: This is easier than crafting an wake-on-lan UDP packet >:)
+        cout << "Mandando wakeonlan" << endl;
+        system(wakeonlan_command.c_str());
+        cout << "wakeonlan mandado" << endl;
+        break;
+      default:
+        socket.send(data, msg.ip, msg.port);
+        break;
+    }
+  }
+}
+
+// https://excalidraw.com/#room=478a3d89bb06fa6b61d7,xpaRiHIbFWLOuf9l1_ye2Q
+
+void message_receiver(Atomic<ParticipantTable>& table, Channel<None>& running,
+                      Socket& socket) {
+
   while (running.is_open()) {
-    auto msg = socket.receive(); // TODO: Decode the next message from UDP, check the type, update the table
+    auto msg = socket.receive();
 
-    MessageType received;  // TODO: Decode this from UDP
+    Message received = decode_message(msg.data); 
 
-    switch (received) {
+    switch (received.message_type) {
       case MessageType::IAmTheLeader:
         // TODO: Get the mac address from the incoming socket message
         table.with(
@@ -69,13 +112,15 @@ void message_receiver(Atomic<ParticipantTable>& table, Channel<None>& running, S
   }
 }
 
+
 void find_leader_mac(Atomic<ParticipantTable>& participants,
                      Channel<Message>& messages) {
   while (participants.compute([&](ParticipantTable& participants) {
     return !participants.leader_mac_address.has_value();
   })) {
-    messages.send(
-        Message{.message_type = MessageType::LookingForLeader, .ip = "255.255.255", .port = APP_PORT });
+    messages.send(Message{.message_type = MessageType::LookingForLeader,
+                          .ip = "255.255.255",
+                          .port = APP_PORT});
 
     // TODO: Maybe sleep a little?
   }
@@ -94,6 +139,38 @@ void setup_leader(bool i_am_the_leader, Atomic<ParticipantTable>& participants,
   }
 }
 
+void command_subservice(Atomic<ParticipantTable>& participants, Channel<Message>& messages) {
+  string input;
+
+  cout << "Digite WAKEUP hostname para enviar um wakeonlan" << endl;
+
+  while (1) {
+    cin >> input;
+
+    if (input.compare("WAKEUP") == 1) {
+      cout << "[cmd] wakeonlan a4:5d:36:c2:bb:91" << endl;
+
+      messages.send(Message{
+          .message_type = MessageType::WakeupRequest,
+          .ip = "0.0.0.0",
+          .mac_address = "a4:5d:36:c2:bb:91",
+          .port = 9,
+      });
+
+      cout << "[info] wakeonlan sent!" << endl;
+    }
+  }
+}
+
+void interface_subservice(Atomic<ParticipantTable>& participants) {
+  ParticipantTable previousTable;
+
+  while (1) {
+    participants.with([&](ParticipantTable& table) {
+    });
+  }
+}
+
 int main(int argc, char* argv[]) {
   bool i_am_the_leader = false;
 
@@ -104,9 +181,6 @@ int main(int argc, char* argv[]) {
 
   Socket socket;
   socket.open(APP_PORT);
-  if (i_am_the_leader) {
-    socket.send("");
-  }
 
   Atomic<ParticipantTable> participants;
   vector<future<void>> threads;
@@ -115,10 +189,18 @@ int main(int argc, char* argv[]) {
   Channel<Message> messages;
 
   // Spawn threads
-  threads.push_back(async(&message_sender, ref(messages)));
-  threads.push_back(async(&message_receiver, ref(participants), ref(running), ref(socket)));
+  threads.push_back(async(&message_sender, ref(messages), ref(socket)));
+  threads.push_back(
+      async(&message_receiver, ref(participants), ref(running), ref(socket)));
 
   setup_leader(i_am_the_leader, participants, messages);
+
+  messages.send(Message{
+      .message_type = MessageType::WakeupRequest,
+      .ip = "0.0.0.0",
+      .mac_address = "a4:5d:36:c2:bb:91",
+      .port = 9,
+  });
 
   // Close channels
   running.close();

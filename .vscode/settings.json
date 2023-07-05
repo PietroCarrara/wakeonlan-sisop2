@@ -11,7 +11,12 @@
     "stop_token": "cpp",
     "functional": "cpp",
     "string": "cpp",
-    "*.tcc": "cpp"
+    "*.tcc": "cpp",
+    "iostream": "cpp",
+    "unordered_map": "cpp",
+    "string_view": "cpp",
+    "deque": "cpp",
+    "list": "cpp"
   },
   "editor.tabSize": 4
 }

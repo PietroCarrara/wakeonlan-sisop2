@@ -10,8 +10,9 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <vector>
+
 #include <iostream>
+#include <vector>
 
 typedef uint16_t Port;
 constexpr size_t BUFFER_SIZE = 256;
@@ -30,11 +31,11 @@ class Socket {
  public:
   void open(Port port);
 
-  Datagram receive() ;
+  Datagram receive();
 
-  void send(string data, string ip, Port port) ;
+  void send(Datagram packet, Port port);
 
-  void send_bytes(vector<byte> data, string ip, Port port) ;
+  void send_bytes(vector<byte> data, string ip, Port port);
 
   ~Socket();
 };

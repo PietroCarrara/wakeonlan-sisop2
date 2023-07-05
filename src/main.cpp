@@ -46,14 +46,14 @@ struct Message {
 
 Message decode_message(string data) {
   if (data == "LookingForLeader") {
-    return Message {
-      .message_type = MessageType::LookingForLeader,
+    return Message{
+        .message_type = MessageType::LookingForLeader,
     };
   }
 
   if (data == "IAmTheLeader") {
-    return Message {
-      .message_type = MessageType::IAmTheLeader,
+    return Message{
+        .message_type = MessageType::IAmTheLeader,
     };
   }
 }
@@ -81,21 +81,19 @@ void message_sender(Channel<Message>& messages, Socket& socket) {
         cout << "wakeonlan mandado" << endl;
         break;
       default:
-        socket.send(data, msg.ip, msg.port);
+        Datagram packet = Datagram{.data = data, .ip = msg.ip};
+        socket.send(packet, msg.port);
         break;
     }
   }
 }
 
-// https://excalidraw.com/#room=478a3d89bb06fa6b61d7,xpaRiHIbFWLOuf9l1_ye2Q
-
 void message_receiver(Atomic<ParticipantTable>& table, Channel<None>& running,
                       Socket& socket) {
-
   while (running.is_open()) {
-    auto msg = socket.receive();
+    Datagram msg = socket.receive();
 
-    Message received = decode_message(msg.data); 
+    Message received = decode_message(msg.data);
 
     switch (received.message_type) {
       case MessageType::IAmTheLeader:
@@ -111,7 +109,6 @@ void message_receiver(Atomic<ParticipantTable>& table, Channel<None>& running,
     }
   }
 }
-
 
 void find_leader_mac(Atomic<ParticipantTable>& participants,
                      Channel<Message>& messages) {
@@ -139,7 +136,8 @@ void setup_leader(bool i_am_the_leader, Atomic<ParticipantTable>& participants,
   }
 }
 
-void command_subservice(Atomic<ParticipantTable>& participants, Channel<Message>& messages) {
+void command_subservice(Atomic<ParticipantTable>& participants,
+                        Channel<Message>& messages) {
   string input;
 
   cout << "Digite WAKEUP hostname para enviar um wakeonlan" << endl;
@@ -166,8 +164,7 @@ void interface_subservice(Atomic<ParticipantTable>& participants) {
   ParticipantTable previousTable;
 
   while (1) {
-    participants.with([&](ParticipantTable& table) {
-    });
+    participants.with([&](ParticipantTable& table) {});
   }
 }
 

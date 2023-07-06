@@ -1,5 +1,5 @@
 {
-  "C_Cpp.clang_format_style": "Google",
+  "C_Cpp.clang_format_style": "Microsoft",
   "C_Cpp.default.cppStandard": "c++23",
   "files.associations": {
     "vector": "cpp",
@@ -16,7 +16,8 @@
     "unordered_map": "cpp",
     "string_view": "cpp",
     "deque": "cpp",
-    "list": "cpp"
+    "list": "cpp",
+    "socket": "cpp"
   },
   "editor.tabSize": 4
 }

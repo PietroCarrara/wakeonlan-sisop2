@@ -8,11 +8,12 @@
 
 using namespace std;
 
-enum struct MessageType {
-  Heartbeat,
-  WakeupRequest,
-  LookingForLeader,
-  IAmTheLeader
+enum struct MessageType
+{
+    Heartbeat,
+    WakeupRequest,
+    LookingForLeader,
+    IAmTheLeader
 };
 
 /**
@@ -20,19 +21,27 @@ enum struct MessageType {
  * message_type = 3, ip = 1.2.3.4, mac_address = 55:55:55:55:55:55, port = 666
  * encoded message: "3;1.2.3.4;55:55:55:55:55:55;666"
  * */
-class Message {
- private:
-  MessageType message_type;
-  string ip;
-  string mac_address;
-  int port;
+class Message
+{
+  private:
+    MessageType _message_type;
+    string _ip;
+    string _mac_address;
+    int _port;
 
-  vector<string> split(string str, char separator);
+    static vector<string> split(string str, char separator);
 
- public:
-  void decode(string data);
+  public:
+    Message(MessageType message_type, string ip, string mac_address, int port);
 
-  string encode();
+    MessageType get_message_type();
+    string get_ip();
+    string get_mac_address();
+    int get_port();
+
+    static Message decode(string data);
+
+    string encode();
 };
 
 #endif

@@ -19,25 +19,27 @@ constexpr size_t BUFFER_SIZE = 256;
 
 using namespace std;
 
-struct Datagram {
-  string data;
-  string ip;
+struct Datagram
+{
+    string data;
+    string ip;
 };
 
-class Socket {
- private:
-  int socket_file_descriptor;
+class Socket
+{
+  private:
+    int socket_file_descriptor;
 
- public:
-  void open(Port port);
+  public:
+    void open(Port port);
 
-  Datagram receive();
+    Datagram receive();
 
-  void send(Datagram packet, Port port);
+    void send(Datagram packet, Port port);
 
-  void send_bytes(vector<byte> data, string ip, Port port);
+    void send_bytes(vector<byte> data, string ip, Port port);
 
-  ~Socket();
+    ~Socket();
 };
 
 #endif

@@ -23,7 +23,6 @@ struct Datagram
 {
     string data;
     string ip;
-    Port port;
 };
 
 class Socket
@@ -36,7 +35,7 @@ class Socket
 
     Datagram receive();
 
-    void send(Datagram packet);
+    void send(Datagram packet, Port port);
 
     ~Socket();
 };

@@ -33,17 +33,17 @@ Datagram Socket::receive()
     string ip(inet_ntoa(sender_address.sin_addr));
     Port port = sender_address.sin_port;
     string data(buf);
-    struct Datagram result = {.data = data, .ip = ip, .port = port};
+    struct Datagram result = {.data = data, .ip = ip};
 
     return result;
 }
 
-void Socket::send(Datagram packet)
+void Socket::send(Datagram packet, Port port)
 {
     const char *ip_c_str = packet.ip.c_str();
     struct in_addr in_address = {.s_addr = inet_addr(ip_c_str)};
     struct sockaddr_in recipient_address = {
-        .sin_family = AF_INET, .sin_port = htons(packet.port), .sin_addr = in_address};
+        .sin_family = AF_INET, .sin_port = htons(port), .sin_addr = in_address};
 
     const char *bytes = packet.data.c_str();
     const int total_data_length = packet.data.length() + 1; // +1 because of '\0'

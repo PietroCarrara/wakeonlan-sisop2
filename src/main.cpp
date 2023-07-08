@@ -12,7 +12,8 @@
 #include "message.h"
 #include "socket.h"
 
-constexpr Port APP_PORT = 5000;
+constexpr Port SEND_PORT = 5001;
+constexpr Port RECEIVE_PORT = 5000;
 
 using namespace std;
 
@@ -43,7 +44,7 @@ void message_sender(Channel<Message> &messages, Socket &socket)
         string data = msg.encode();
         string wakeonlan_command = "wakeonlan " + msg.get_mac_address();
 
-        cout << "sending " << data << " to " << msg.get_ip() << endl;
+        cout << "sending " << data << " to " << msg.get_ip() << ":" << msg.get_port() << endl;
 
         switch (msg.get_message_type())
         {
@@ -54,8 +55,8 @@ void message_sender(Channel<Message> &messages, Socket &socket)
             cout << "wakeonlan mandado" << endl;
             break;
         default:
-            Datagram packet = Datagram{.data = data, .ip = msg.get_ip(), .port = msg.get_port()};
-            socket.send(packet);
+            Datagram packet = Datagram{.data = data, .ip = msg.get_ip()};
+            socket.send(packet, SEND_PORT);
             break;
         }
     }
@@ -90,7 +91,7 @@ void message_receiver(Atomic<ParticipantTable> &table, Channel<None> &running, S
             {
                 cout << "hey there, " << message.get_mac_address() << ", I'm the leader!" << endl;
                 messages.send(
-                    Message(MessageType::IAmTheLeader, datagram.ip, message.get_mac_address(), datagram.port));
+                    Message(MessageType::IAmTheLeader, datagram.ip, message.get_mac_address(), SEND_PORT));
             }
             break;
 
@@ -106,7 +107,7 @@ void find_leader_mac(Atomic<ParticipantTable> &participants, Channel<Message> &m
     while (participants.compute(
         [&](ParticipantTable &participants) { return !participants.leader_mac_address.has_value(); }))
     {
-        Message message(MessageType::LookingForLeader, "127.0.0.1", "", APP_PORT);
+        Message message(MessageType::LookingForLeader, "127.0.0.1", "", SEND_PORT);
         messages.send(message);
 
         this_thread::sleep_for(1s);
@@ -206,7 +207,7 @@ int main(int argc, char *argv[])
     }
 
     Socket socket;
-    socket.open(APP_PORT);
+    socket.open(RECEIVE_PORT);
 
     Atomic<ParticipantTable> participants;
     vector<thread> threads;

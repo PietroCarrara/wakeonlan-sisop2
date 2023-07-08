@@ -13,7 +13,6 @@
 #include "socket.h"
 
 constexpr Port APP_PORT = 5000;
-constexpr Port DIFF = 1;
 
 using namespace std;
 
@@ -44,39 +43,58 @@ void message_sender(Channel<Message> &messages, Socket &socket)
         string data = msg.encode();
         string wakeonlan_command = "wakeonlan " + msg.get_mac_address();
 
+        cout << "sending " << data << " to " << msg.get_ip() << endl;
+
         switch (msg.get_message_type())
         {
         case MessageType::WakeupRequest:
             // HACK: This is easier than crafting an wake-on-lan UDP packet >:)
             cout << "Mandando wakeonlan" << endl;
-            system(wakeonlan_command.c_str());
+            // system(wakeonlan_command.c_str());
             cout << "wakeonlan mandado" << endl;
             break;
         default:
-            Datagram packet = Datagram{.data = data, .ip = msg.get_ip()};
-            socket.send(packet, msg.get_port());
+            Datagram packet = Datagram{.data = data, .ip = msg.get_ip(), .port = msg.get_port()};
+            socket.send(packet);
             break;
         }
     }
 }
 
-void message_receiver(Atomic<ParticipantTable> &table, Channel<None> &running, Socket &socket)
+// TODO: Check if the mac address of the leader matches ours
+bool self_is_leader(Atomic<ParticipantTable> &table)
+{
+    return true;
+}
+
+void message_receiver(Atomic<ParticipantTable> &table, Channel<None> &running, Socket &socket,
+                      Channel<Message> &messages)
 {
     while (running.is_open())
     {
-        Datagram msg = socket.receive();
+        Datagram datagram = socket.receive();
 
-        Message received = Message::decode(msg.data);
+        Message message = Message::decode(datagram.data);
 
-        switch (received.get_message_type())
+        cout << "got message!" << endl;
+
+        switch (message.get_message_type())
         {
         case MessageType::IAmTheLeader:
             // TODO: Get the mac address from the incoming socket message
             table.with([&](ParticipantTable &table) { table.leader_mac_address = "..."; });
             break;
 
-            // TODO: Handle the rest of the cases
+        case MessageType::LookingForLeader:
+            if (self_is_leader(table))
+            {
+                cout << "hey there, " << message.get_mac_address() << ", I'm the leader!" << endl;
+                messages.send(
+                    Message(MessageType::IAmTheLeader, datagram.ip, message.get_mac_address(), datagram.port));
+            }
+            break;
 
+        // TODO: Handle the rest of the cases
         default:
             break;
         }
@@ -88,10 +106,10 @@ void find_leader_mac(Atomic<ParticipantTable> &participants, Channel<Message> &m
     while (participants.compute(
         [&](ParticipantTable &participants) { return !participants.leader_mac_address.has_value(); }))
     {
-        Message message(MessageType::LookingForLeader, "255.255.255.255", "", APP_PORT + DIFF);
+        Message message(MessageType::LookingForLeader, "255.255.255", "", APP_PORT);
         messages.send(message);
 
-        // TODO: Maybe sleep a little?
+        this_thread::sleep_for(100ms);
     }
 }
 
@@ -107,7 +125,7 @@ void setup_leader(bool i_am_the_leader, Atomic<ParticipantTable> &participants, 
     else
     {
         cout << "Looking for leader..." << endl;
-        async(&find_leader_mac, ref(participants), ref(messages)).wait();
+        thread(find_leader_mac, ref(participants), ref(messages)).join();
     }
 }
 
@@ -134,18 +152,18 @@ void command_subservice(Atomic<ParticipantTable> &participants, Channel<Message>
     }
 }
 
-
-bool tables_are_equal(ParticipantTable& table_a, ParticipantTable& table_b) {
+bool tables_are_equal(ParticipantTable &table_a, ParticipantTable &table_b)
+{
     // TODO: Compare the tables
     return false;
 }
 
-ParticipantTable copy_table(ParticipantTable& to_copy)
+ParticipantTable copy_table(ParticipantTable &to_copy)
 {
     ParticipantTable result;
 
     result.leader_mac_address = to_copy.leader_mac_address;
-    for (auto& participant : to_copy.participants)
+    for (auto &participant : to_copy.participants)
     {
         result.participants.push_back(participant);
     }
@@ -161,14 +179,16 @@ void interface_subservice(Atomic<ParticipantTable> &participants)
     {
         bool table_changed = false;
 
-        participants.with([&](ParticipantTable& table) {
+        participants.with([&](ParticipantTable &table) {
             table_changed = tables_are_equal(previous_table, table);
-            if (table_changed) {
+            if (table_changed)
+            {
                 previous_table = copy_table(table);
             }
         });
 
-        if (table_changed) {
+        if (table_changed)
+        {
             // TODO: Print table
         }
     }
@@ -186,30 +206,31 @@ int main(int argc, char *argv[])
     }
 
     Socket socket;
-    socket.open(APP_PORT - DIFF);
+    socket.open(APP_PORT+1);
 
     Atomic<ParticipantTable> participants;
-    vector<future<void>> threads;
+    vector<thread> threads;
 
     Channel<None> running;
     Channel<Message> messages;
 
     // Spawn threads
-    threads.push_back(async(&message_sender, ref(messages), ref(socket)));
-    threads.push_back(async(&message_receiver, ref(participants), ref(running), ref(socket)));
+    threads.push_back(thread(message_sender, ref(messages), ref(socket)));
+    threads.push_back(thread(message_receiver, ref(participants), ref(running), ref(socket), ref(messages)));
 
     setup_leader(i_am_the_leader, participants, messages);
 
-    Message message(MessageType::WakeupRequest, "0.0.0.0", "a4:5d:36:c2:bb:91", 9);
-    messages.send(message);
+    while (running.is_open())
+    {
+        // wait...
+    }
 
     // Close channels
-    running.close();
     messages.close();
 
     // Wait everyone
     for (auto &thread : threads)
     {
-        thread.wait();
+        thread.join();
     }
 }

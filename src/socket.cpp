@@ -37,30 +37,14 @@ Datagram Socket::receive()
     return result;
 }
 
-void Socket::send(Datagram packet, Port port)
+void Socket::send(Datagram packet)
 {
     const char *ip_c_str = packet.ip.c_str();
     struct in_addr in_address = {.s_addr = inet_addr(ip_c_str)};
-    struct sockaddr_in recipient_address = {.sin_family = AF_INET, .sin_port = htons(port), .sin_addr = in_address};
+    struct sockaddr_in recipient_address = {.sin_family = AF_INET, .sin_port = htons(packet.port), .sin_addr = in_address};
 
     const char *bytes = packet.data.c_str();
     const int total_data_length = packet.data.length() + 1; // +1 because of '\0'
-
-    int sent_bytes_count = sendto(socket_file_descriptor, bytes, total_data_length, 0,
-                                  (struct sockaddr *)&recipient_address, sizeof(struct sockaddr));
-
-    if (sent_bytes_count < 0)
-        printf("ERROR on sendto");
-}
-
-void Socket::send_bytes(vector<byte> data, string ip, Port port)
-{
-    const char *ip_c_str = ip.c_str();
-    struct in_addr in_address = {.s_addr = inet_addr(ip_c_str)};
-    struct sockaddr_in recipient_address = {.sin_family = AF_INET, .sin_port = htons(port), .sin_addr = in_address};
-
-    byte *bytes = data.data();
-    const int total_data_length = data.size();
 
     int sent_bytes_count = sendto(socket_file_descriptor, bytes, total_data_length, 0,
                                   (struct sockaddr *)&recipient_address, sizeof(struct sockaddr));

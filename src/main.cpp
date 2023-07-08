@@ -44,19 +44,20 @@ void message_sender(Channel<Message> &messages, Socket &socket)
         string data = msg.encode();
         string wakeonlan_command = "wakeonlan " + msg.get_mac_address();
 
-        cout << "sending " << data << " to " << msg.get_ip() << ":" << msg.get_port() << endl;
+        cout << "sending to " << msg.get_ip() << ":" << msg.get_port() << endl;
 
         switch (msg.get_message_type())
         {
         case MessageType::WakeupRequest:
             // HACK: This is easier than crafting an wake-on-lan UDP packet >:)
             cout << "Mandando wakeonlan" << endl;
-            // system(wakeonlan_command.c_str());
+            system(wakeonlan_command.c_str());
             cout << "wakeonlan mandado" << endl;
             break;
         default:
             Datagram packet = Datagram{.data = data, .ip = msg.get_ip()};
-            socket.send(packet, SEND_PORT);
+            bool success = socket.send(packet, SEND_PORT);
+            cout << "send was successful: " << success << endl;
             break;
         }
     }
@@ -73,7 +74,12 @@ void message_receiver(Atomic<ParticipantTable> &table, Channel<None> &running, S
 {
     while (running.is_open())
     {
-        Datagram datagram = socket.receive();
+        auto datagram_option = socket.receive();
+        if (!datagram_option) {
+            this_thread::sleep_for(101ms);
+            continue;
+        }
+        Datagram datagram = datagram_option.value();
 
         Message message = Message::decode(datagram.data);
 
@@ -110,7 +116,7 @@ void find_leader_mac(Atomic<ParticipantTable> &participants, Channel<Message> &m
         Message message(MessageType::LookingForLeader, "127.0.0.1", "", SEND_PORT);
         messages.send(message);
 
-        this_thread::sleep_for(1s);
+        this_thread::sleep_for(100ms);
     }
 }
 
@@ -141,7 +147,7 @@ void command_subservice(Atomic<ParticipantTable> &participants, Channel<Message>
     {
         cin >> input;
 
-        if (input.compare("WAKEUP") == 1)
+        if (input == "WAKEUP")
         {
             cout << "[cmd] wakeonlan a4:5d:36:c2:bb:91" << endl;
 
@@ -202,12 +208,12 @@ int main(int argc, char *argv[])
     if (argc > 1)
     {
         string arg = argv[1];
-        if (arg.compare("manager") == 0)
+        if (arg == "manager")
             i_am_the_leader = true;
     }
 
-    Socket socket;
-    socket.open(RECEIVE_PORT);
+    Socket socket(RECEIVE_PORT, SEND_PORT);
+    socket.open();
 
     Atomic<ParticipantTable> participants;
     vector<thread> threads;

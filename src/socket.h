@@ -11,6 +11,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <mutex>
+#include <optional>
 #include <iostream>
 #include <vector>
 
@@ -29,13 +31,17 @@ class Socket
 {
   private:
     int socket_file_descriptor;
+    mutex lock;
+    Port receive_port, send_port;
 
   public:
-    void open(Port port);
+    Socket(Port receive_port, Port send_port);
 
-    Datagram receive();
+    void open();
 
-    void send(Datagram packet, Port port);
+    optional<Datagram> receive();
+
+    bool send(Datagram packet, Port port);
 
     ~Socket();
 };

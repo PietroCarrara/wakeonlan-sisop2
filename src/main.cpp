@@ -132,14 +132,17 @@ void command_subservice(Atomic<ParticipantTable> &participants, Channel<Message>
     }
 }
 
-void interface_subservice(Atomic<ParticipantTable> &participants)
-{
-    ParticipantTable previousTable;
+bool tableHasChanged = false;
 
-    while (1)
-    {
-        participants.with([&](ParticipantTable &table) {});
-    }
+void interface_subservice(Atomic<ParticipantTable>& participants) {
+  Atomic<ParticipantTable>& previousTable = participants;
+  
+  while (!tableHasChanged) {
+    tableHasChanged =
+        memcmp(&participants, &previousTable, sizeof(ParticipantTable)) != 0;
+  }
+
+  interface_subservice(participants);
 }
 
 int main(int argc, char *argv[])

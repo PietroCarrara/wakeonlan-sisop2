@@ -106,10 +106,10 @@ void find_leader_mac(Atomic<ParticipantTable> &participants, Channel<Message> &m
     while (participants.compute(
         [&](ParticipantTable &participants) { return !participants.leader_mac_address.has_value(); }))
     {
-        Message message(MessageType::LookingForLeader, "255.255.255", "", APP_PORT);
+        Message message(MessageType::LookingForLeader, "127.0.0.1", "", APP_PORT);
         messages.send(message);
 
-        this_thread::sleep_for(100ms);
+        this_thread::sleep_for(1s);
     }
 }
 
@@ -206,7 +206,7 @@ int main(int argc, char *argv[])
     }
 
     Socket socket;
-    socket.open(APP_PORT+1);
+    socket.open(APP_PORT);
 
     Atomic<ParticipantTable> participants;
     vector<thread> threads;

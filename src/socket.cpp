@@ -31,8 +31,9 @@ Datagram Socket::receive()
     printf("Received a datagram: %s\n", buf);
 
     string ip(inet_ntoa(sender_address.sin_addr));
+    Port port = sender_address.sin_port;
     string data(buf);
-    struct Datagram result = {.data = data, .ip = ip};
+    struct Datagram result = {.data = data, .ip = ip, .port = port};
 
     return result;
 }
@@ -41,7 +42,8 @@ void Socket::send(Datagram packet)
 {
     const char *ip_c_str = packet.ip.c_str();
     struct in_addr in_address = {.s_addr = inet_addr(ip_c_str)};
-    struct sockaddr_in recipient_address = {.sin_family = AF_INET, .sin_port = htons(packet.port), .sin_addr = in_address};
+    struct sockaddr_in recipient_address = {
+        .sin_family = AF_INET, .sin_port = htons(packet.port), .sin_addr = in_address};
 
     const char *bytes = packet.data.c_str();
     const int total_data_length = packet.data.length() + 1; // +1 because of '\0'
@@ -50,7 +52,7 @@ void Socket::send(Datagram packet)
                                   (struct sockaddr *)&recipient_address, sizeof(struct sockaddr));
 
     if (sent_bytes_count < 0)
-        printf("ERROR on sendto");
+        printf("ERROR on sendto\n");
 }
 
 Socket::~Socket()

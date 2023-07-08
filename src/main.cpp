@@ -13,6 +13,7 @@
 #include "socket.h"
 
 constexpr Port APP_PORT = 5000;
+constexpr Port DIFF = 1;
 
 using namespace std;
 
@@ -87,7 +88,7 @@ void find_leader_mac(Atomic<ParticipantTable> &participants, Channel<Message> &m
     while (participants.compute(
         [&](ParticipantTable &participants) { return !participants.leader_mac_address.has_value(); }))
     {
-        Message message(MessageType::LookingForLeader, "255.255.255.255", "", APP_PORT);
+        Message message(MessageType::LookingForLeader, "255.255.255.255", "", APP_PORT + DIFF);
         messages.send(message);
 
         // TODO: Maybe sleep a little?
@@ -116,6 +117,7 @@ void command_subservice(Atomic<ParticipantTable> &participants, Channel<Message>
 
     cout << "Digite WAKEUP hostname para enviar um wakeonlan" << endl;
 
+    // TODO: Change to "while the program is running", not "while true"
     while (1)
     {
         cin >> input;
@@ -132,17 +134,44 @@ void command_subservice(Atomic<ParticipantTable> &participants, Channel<Message>
     }
 }
 
-bool tableHasChanged = false;
 
-void interface_subservice(Atomic<ParticipantTable>& participants) {
-  Atomic<ParticipantTable>& previousTable = participants;
-  
-  while (!tableHasChanged) {
-    tableHasChanged =
-        memcmp(&participants, &previousTable, sizeof(ParticipantTable)) != 0;
-  }
+bool tables_are_equal(ParticipantTable& table_a, ParticipantTable& table_b) {
+    // TODO: Compare the tables
+    return false;
+}
 
-  interface_subservice(participants);
+ParticipantTable copy_table(ParticipantTable& to_copy)
+{
+    ParticipantTable result;
+
+    result.leader_mac_address = to_copy.leader_mac_address;
+    for (auto& participant : to_copy.participants)
+    {
+        result.participants.push_back(participant);
+    }
+
+    return result;
+}
+
+void interface_subservice(Atomic<ParticipantTable> &participants)
+{
+    ParticipantTable previous_table;
+
+    while (true)
+    {
+        bool table_changed = false;
+
+        participants.with([&](ParticipantTable& table) {
+            table_changed = tables_are_equal(previous_table, table);
+            if (table_changed) {
+                previous_table = copy_table(table);
+            }
+        });
+
+        if (table_changed) {
+            // TODO: Print table
+        }
+    }
 }
 
 int main(int argc, char *argv[])
@@ -157,7 +186,7 @@ int main(int argc, char *argv[])
     }
 
     Socket socket;
-    socket.open(APP_PORT);
+    socket.open(APP_PORT - DIFF);
 
     Atomic<ParticipantTable> participants;
     vector<future<void>> threads;

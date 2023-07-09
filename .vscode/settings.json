@@ -17,7 +17,8 @@
     "string_view": "cpp",
     "deque": "cpp",
     "list": "cpp",
-    "socket": "cpp"
+    "socket": "cpp",
+    "chrono": "cpp"
   },
   "editor.tabSize": 4
 }

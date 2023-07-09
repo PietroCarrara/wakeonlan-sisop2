@@ -1,5 +1,6 @@
 #include <chrono>
 #include <future>
+#include <iomanip>
 #include <iostream>
 #include <optional>
 #include <semaphore>
@@ -161,8 +162,27 @@ void command_subservice(Atomic<ParticipantTable> &participants, Channel<Message>
 
 bool tables_are_equal(ParticipantTable &table_a, ParticipantTable &table_b)
 {
-    // TODO: Compare the tables
-    return false;
+    if ((table_a.leader_mac_address != table_b.leader_mac_address) ||
+        (table_a.participants.size() != table_b.participants.size()))
+    {
+        return false;
+    }
+
+    for (size_t i = 0; i < table_a.participants.size(); i++)
+    {
+        const Participant &participant_a = table_a.participants[i];
+        const Participant &participant_b = table_b.participants[i];
+
+        if (participant_a.hostname != participant_b.hostname ||
+            participant_a.mac_address != participant_b.mac_address ||
+            participant_a.ip_address != participant_b.ip_address ||
+            participant_a.last_time_seen_alive != participant_b.last_time_seen_alive)
+        {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 ParticipantTable copy_table(ParticipantTable &to_copy)
@@ -196,7 +216,25 @@ void interface_subservice(Atomic<ParticipantTable> &participants)
 
         if (table_changed)
         {
-            // TODO: Print table
+            participants.with([&](ParticipantTable &table) {
+                string leader_mac_address =
+                    table.leader_mac_address ? table.leader_mac_address.value() : "No Leader MAC Address";
+                cout << "Table" << endl;
+                cout << "Leader MAC Address: " << leader_mac_address << endl;
+                cout << "Participants:" << endl;
+                cout << "| Hostname |    MAC Address    | IP Address  | Last Time Seen Alive |" << endl;
+
+                for (size_t i = 0; i < table.participants.size(); i++)
+                {
+                    time_t last_time_seen_alive =
+                        chrono::system_clock::to_time_t(table.participants[i].last_time_seen_alive);
+                    cout << '|' << " " << table.participants[i].hostname << "    ";
+                    cout << '|' << " " << table.participants[i].mac_address << " ";
+                    cout << '|' << " " << table.participants[i].ip_address << " ";
+                    cout << '|' << " " << put_time(localtime(&last_time_seen_alive), "%Y-%m-%d %H:%M:%S") << "  " << '|'
+                         << endl;
+                }
+            });
         }
     }
 }

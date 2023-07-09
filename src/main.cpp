@@ -128,12 +128,12 @@ void find_manager(Atomic<ParticipantTable> &participants, Channel<Message> &mess
 string get_self_mac_address()
 {
     // TODO: see what interface we use in labs ('eth0' or 'wlo1' or something else)
-    string str2 = "/sbin/ip link show wlo1 | awk '/ether/{print $2}'";
+    string get_mac_command = "/sbin/ip link show wlo1 | awk '/ether/{print $2}'";
     char buffer[17];
 
     string result = "";
 
-    FILE *pipe = popen(str2.c_str(), "r");
+    FILE *pipe = popen(get_mac_command.c_str(), "r");
     while (fgets(buffer, 17, pipe) != NULL)
         result += buffer;
     pclose(pipe);
@@ -231,18 +231,46 @@ void interface_subservice(Atomic<ParticipantTable> &participants, Channel<None> 
         if (table_changed)
         {
             participants.with([&](ParticipantTable &table) {
-                string leader_mac_address =
-                    table.manager_mac_address ? table.manager_mac_address.value() : "No Leader MAC Address";
-                cout << "Table" << endl;
-                cout << "Leader MAC Address: " << leader_mac_address << endl;
-                cout << "Participants:" << endl;
-                cout << "| Hostname |    MAC Address    | IP Address  | Last Time Seen Alive |" << endl;
+             vector<Participant>::iterator result =
+                    max_element(table.participants.begin(), table.participants.end(),
+                                [](Participant a, Participant b) { return a.hostname.length() < b.hostname.length(); });
 
-                for (size_t i = 0; i < table.participants.size(); i++)
-                {
+                Participant max = *result;
+                int max_length = max.hostname.length();
+
+                string manager_mac_address =
+                    table.manager_mac_address ? table.manager_mac_address.value() : "No Leader MAC Address";
+
+                cout << "Table" << endl;
+                cout << "Leader MAC Address: " << manager_mac_address << endl;
+                cout << "Participants:" << endl;
+                cout << "|";
+
+                if (max_length - 8 > 0) {
+                    for (int i = 0; i < ((max_length - 8) / 2) + 1; i++) {
+                        cout << " ";
+                    }
+
+                    cout << "Hostname";
+
+                    for (int i = 0; i < ((max_length - 8) / 2) + 1; i++) {
+                        cout << " ";
+                    }
+                } else {
+                    cout << " Hostname ";
+                }
+
+                cout << "|    MAC Address    | IP Address  | Last Time Seen Alive |" << endl;
+
+                for (size_t i = 0; i < table.participants.size(); i++) {
                     time_t last_time_seen_alive =
                         chrono::system_clock::to_time_t(table.participants[i].last_time_seen_alive);
-                    cout << '|' << " " << table.participants[i].hostname << "    ";
+                    cout << '|' << " " << table.participants[i].hostname;
+                    int spaces_to_add = max_length > 8 ? max_length - table.participants[i].hostname.length() + 1
+                                                       : 8 - table.participants[i].hostname.length() + 1;
+                    for (int i = 0; i < spaces_to_add; i++) {
+                        cout << " ";
+                    }
                     cout << '|' << " " << table.participants[i].mac_address << " ";
                     cout << '|' << " " << table.participants[i].ip_address << " ";
                     cout << '|' << " " << put_time(localtime(&last_time_seen_alive), "%Y-%m-%d %H:%M:%S") << "  " << '|'

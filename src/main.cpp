@@ -13,8 +13,8 @@
 #include "message.h"
 #include "socket.h"
 
-constexpr Port SEND_PORT = 5001;
-constexpr Port RECEIVE_PORT = 5000;
+constexpr Port SEND_PORT = 5000;
+constexpr Port RECEIVE_PORT = 5001;
 
 using namespace std;
 
@@ -33,7 +33,7 @@ struct Participant
 struct ParticipantTable
 {
     // The leader's MAC address. Empty if we haven't found it yet.
-    optional<string> leader_mac_address;
+    optional<string> manager_mac_address;
     vector<Participant> participants;
 };
 
@@ -71,12 +71,13 @@ bool self_is_leader(Atomic<ParticipantTable> &table)
 }
 
 void message_receiver(Atomic<ParticipantTable> &table, Channel<None> &running, Socket &socket,
-                      Channel<Message> &messages)
+                      Channel<Message> &messages, bool is_manager)
 {
     while (running.is_open())
     {
         auto datagram_option = socket.receive();
-        if (!datagram_option) {
+        if (!datagram_option)
+        {
             this_thread::sleep_for(101ms);
             continue;
         }
@@ -90,15 +91,14 @@ void message_receiver(Atomic<ParticipantTable> &table, Channel<None> &running, S
         {
         case MessageType::IAmTheLeader:
             // TODO: Get the mac address from the incoming socket message
-            table.with([&](ParticipantTable &table) { table.leader_mac_address = "..."; });
+            table.with([&](ParticipantTable &table) { table.manager_mac_address = "..."; });
             break;
 
         case MessageType::LookingForLeader:
             if (self_is_leader(table))
             {
                 cout << "hey there, " << message.get_mac_address() << ", I'm the leader!" << endl;
-                messages.send(
-                    Message(MessageType::IAmTheLeader, datagram.ip, message.get_mac_address(), SEND_PORT));
+                messages.send(Message(MessageType::IAmTheLeader, datagram.ip, message.get_mac_address(), SEND_PORT));
             }
             break;
 
@@ -109,42 +109,52 @@ void message_receiver(Atomic<ParticipantTable> &table, Channel<None> &running, S
     }
 }
 
-void find_leader_mac(Atomic<ParticipantTable> &participants, Channel<Message> &messages)
+void find_manager(Atomic<ParticipantTable> &participants, Channel<Message> &messages)
 {
+    cout << "looking for leader" << endl << endl;
+
     while (participants.compute(
-        [&](ParticipantTable &participants) { return !participants.leader_mac_address.has_value(); }))
+        [&](ParticipantTable &participants) { return !participants.manager_mac_address.has_value(); }))
     {
+        // TODO: Sending do IP 127.0.0.1 to work on localhost,
+        //       to make broadcast, we need to send to 255.255.255.255
         Message message(MessageType::LookingForLeader, "127.0.0.1", "", SEND_PORT);
         messages.send(message);
 
-        this_thread::sleep_for(100ms);
+        this_thread::sleep_for(500ms);
     }
 }
 
-void setup_leader(bool i_am_the_leader, Atomic<ParticipantTable> &participants, Channel<Message> &messages)
+string get_self_mac_address()
 {
-    if (i_am_the_leader)
-    {
-        participants.with([&](ParticipantTable &participants) {
-            // TODO: Get our own mac address
-            participants.leader_mac_address = "00:00:00:00:00:00";
-        });
-    }
-    else
-    {
-        cout << "Looking for leader..." << endl;
-        thread(find_leader_mac, ref(participants), ref(messages)).join();
-    }
+    // TODO: see what interface we use in labs ('eth0' or 'wlo1' or something else)
+    string str2 = "/sbin/ip link show wlo1 | awk '/ether/{print $2}'";
+    char buffer[17];
+
+    string result = "";
+
+    FILE *pipe = popen(str2.c_str(), "r");
+    while (fgets(buffer, 17, pipe) != NULL)
+        result += buffer;
+    pclose(pipe);
+
+    return result;
 }
 
-void command_subservice(Atomic<ParticipantTable> &participants, Channel<Message> &messages)
+void setup_manager(Atomic<ParticipantTable> &participants)
+{
+    string mac = get_self_mac_address();
+
+    participants.with([&](ParticipantTable &participants) { participants.manager_mac_address = mac; });
+}
+
+void command_subservice(Atomic<ParticipantTable> &participants, Channel<Message> &messages, Channel<None> &running)
 {
     string input;
 
-    cout << "Digite WAKEUP hostname para enviar um wakeonlan" << endl;
+    cout << "> ";
 
-    // TODO: Change to "while the program is running", not "while true"
-    while (1)
+    while (running.is_open())
     {
         cin >> input;
 
@@ -157,12 +167,16 @@ void command_subservice(Atomic<ParticipantTable> &participants, Channel<Message>
 
             cout << "[info] wakeonlan sent!" << endl;
         }
+        else if (input == "EXIT")
+        {
+            running.close();
+        }
     }
 }
 
 bool tables_are_equal(ParticipantTable &table_a, ParticipantTable &table_b)
 {
-    if ((table_a.leader_mac_address != table_b.leader_mac_address) ||
+    if ((table_a.manager_mac_address != table_b.manager_mac_address) ||
         (table_a.participants.size() != table_b.participants.size()))
     {
         return false;
@@ -189,7 +203,7 @@ ParticipantTable copy_table(ParticipantTable &to_copy)
 {
     ParticipantTable result;
 
-    result.leader_mac_address = to_copy.leader_mac_address;
+    result.manager_mac_address = to_copy.manager_mac_address;
     for (auto &participant : to_copy.participants)
     {
         result.participants.push_back(participant);
@@ -198,16 +212,16 @@ ParticipantTable copy_table(ParticipantTable &to_copy)
     return result;
 }
 
-void interface_subservice(Atomic<ParticipantTable> &participants)
+void interface_subservice(Atomic<ParticipantTable> &participants, Channel<None> &running)
 {
     ParticipantTable previous_table;
 
-    while (true)
+    while (running.is_open())
     {
         bool table_changed = false;
 
         participants.with([&](ParticipantTable &table) {
-            table_changed = tables_are_equal(previous_table, table);
+            table_changed = !tables_are_equal(previous_table, table);
             if (table_changed)
             {
                 previous_table = copy_table(table);
@@ -218,7 +232,7 @@ void interface_subservice(Atomic<ParticipantTable> &participants)
         {
             participants.with([&](ParticipantTable &table) {
                 string leader_mac_address =
-                    table.leader_mac_address ? table.leader_mac_address.value() : "No Leader MAC Address";
+                    table.manager_mac_address ? table.manager_mac_address.value() : "No Leader MAC Address";
                 cout << "Table" << endl;
                 cout << "Leader MAC Address: " << leader_mac_address << endl;
                 cout << "Participants:" << endl;
@@ -232,6 +246,7 @@ void interface_subservice(Atomic<ParticipantTable> &participants)
                     cout << '|' << " " << table.participants[i].mac_address << " ";
                     cout << '|' << " " << table.participants[i].ip_address << " ";
                     cout << '|' << " " << put_time(localtime(&last_time_seen_alive), "%Y-%m-%d %H:%M:%S") << "  " << '|'
+                         << endl
                          << endl;
                 }
             });
@@ -239,31 +254,42 @@ void interface_subservice(Atomic<ParticipantTable> &participants)
     }
 }
 
+bool has_manager_role(int argc, char *argv[])
+{
+    if (argc > 1)
+        return (string)argv[1] == "manager";
+
+    return false;
+}
+
 int main(int argc, char *argv[])
 {
-    bool i_am_the_leader = false;
-
-    if (argc > 1)
-    {
-        string arg = argv[1];
-        if (arg == "manager")
-            i_am_the_leader = true;
-    }
-
-    Socket socket(RECEIVE_PORT, SEND_PORT);
-    socket.open();
-
     Atomic<ParticipantTable> participants;
     vector<thread> threads;
 
     Channel<None> running;
     Channel<Message> messages;
 
-    // Spawn threads
-    threads.push_back(thread(message_sender, ref(messages), ref(socket)));
-    threads.push_back(thread(message_receiver, ref(participants), ref(running), ref(socket), ref(messages)));
+    Socket socket(RECEIVE_PORT, SEND_PORT);
+    socket.open();
 
-    setup_leader(i_am_the_leader, participants, messages);
+    bool is_manager = has_manager_role(argc, argv);
+
+    // Spawn threads
+    threads.push_back(
+        thread(message_receiver, ref(participants), ref(running), ref(socket), ref(messages), is_manager));
+    threads.push_back(thread(message_sender, ref(messages), ref(socket)));
+    threads.push_back(thread(interface_subservice, ref(participants), ref(running)));
+    threads.push_back(thread(command_subservice, ref(participants), ref(messages), ref(running)));
+
+    if (is_manager)
+    {
+        setup_manager(participants);
+    }
+    else
+    {
+        find_manager(participants, messages);
+    }
 
     while (running.is_open())
     {

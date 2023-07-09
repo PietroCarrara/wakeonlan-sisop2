@@ -18,7 +18,8 @@
     "deque": "cpp",
     "list": "cpp",
     "socket": "cpp",
-    "chrono": "cpp"
+    "chrono": "cpp",
+    "system_error": "cpp"
   },
   "editor.tabSize": 4
 }

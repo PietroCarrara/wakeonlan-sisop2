@@ -1,6 +1,6 @@
 PROJECT = wakeonlan
 CC = g++
-CFLAGS = -Wall -std=c++23 -g -pthread
+CFLAGS = -Wall -std=c++23 -g
 SRC_FILES = src/*.cpp
 OUT_DIR = build
 

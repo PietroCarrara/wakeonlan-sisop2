@@ -19,7 +19,8 @@
     "list": "cpp",
     "socket": "cpp",
     "chrono": "cpp",
-    "system_error": "cpp"
+    "system_error": "cpp",
+    "iomanip": "cpp"
   },
   "editor.tabSize": 4
 }

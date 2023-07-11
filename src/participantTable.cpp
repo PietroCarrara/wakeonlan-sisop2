@@ -104,13 +104,13 @@ void ParticipantTable::print()
         }
         cout << '|' << " " << participants[i].mac_address << " ";
         cout << '|' << " " << participants[i].ip_address << " ";
-        cout << '|' << " " << put_time(localtime(&last_time_seen_alive), "%Y-%m-%d %H:%M:%S") << "  " << '|' << endl
-             << endl;
+        cout << '|' << " " << put_time(localtime(&last_time_seen_alive), "%Y-%m-%d %H:%M:%S") << "  " << '|' << endl;
     }
+    cout << endl;
 }
 
 void ParticipantTable::add_or_update_participant(Participant participant) {
-    for (auto i = 0; i < participants.size(); i++) {
+    for (long unsigned int i = 0; i < participants.size(); i++) {
         auto member = participants[i];
         if (member.ip_address == participant.ip_address) {
             participants[i] = participant;
@@ -119,4 +119,8 @@ void ParticipantTable::add_or_update_participant(Participant participant) {
     }
     
     participants.push_back(participant);
+}
+
+vector<Participant> ParticipantTable::get_participants() {
+    return participants;
 }

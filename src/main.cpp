@@ -26,7 +26,6 @@ struct None
 
 string get_self_mac_address()
 {
-    // TODO: see what interface we use in labs ('eth0' or 'wlo1' or something else)
     string get_mac_command = "/sbin/ip link show eth0 | awk '/ether/{print $2}' | tr -d '\\n'";
     char buffer[17];
 
@@ -38,6 +37,13 @@ string get_self_mac_address()
     pclose(pipe);
 
     return result;
+}
+
+string get_self_hostname()
+{
+    char hostname[HOST_NAME_MAX + 1];
+    gethostname(hostname, HOST_NAME_MAX + 1);
+    return hostname;
 }
 
 void message_sender(Channel<Message> &messages, Socket &socket)
@@ -94,16 +100,34 @@ void message_receiver(Atomic<ParticipantTable> &table, Channel<None> &running, S
             if (is_manager)
             {
                 cout << "hey there, " << message.get_mac_address() << ", I'm the leader!" << endl;
-                table.with([&](ParticipantTable& table) {
+                table.with([&](ParticipantTable &table) {
                     table.add_or_update_participant(Participant{
-                        .hostname = "seloko",
+                        .hostname = message.get_sender_hostname(),
                         .mac_address = message.get_mac_address(),
                         .ip_address = datagram.ip,
                         .last_time_seen_alive = chrono::system_clock::now(),
                     });
                 });
-                messages.send(Message(MessageType::IAmTheLeader, datagram.ip, get_self_mac_address(), SEND_PORT));
+                messages.send(Message(MessageType::IAmTheLeader, datagram.ip, get_self_mac_address(),
+                                      get_self_hostname(), SEND_PORT));
             }
+            break;
+
+        case MessageType::Heartbeat:
+            table.with([&](ParticipantTable &table) {
+                table.add_or_update_participant(Participant{
+                    .hostname = message.get_sender_hostname(),
+                    .mac_address = message.get_mac_address(),
+                    .ip_address = datagram.ip,
+                    .last_time_seen_alive = chrono::system_clock::now(),
+                });
+            });
+            break;
+
+        case MessageType::HeartbeatRequest:
+            // Someone requested a heartbeat, let's send it to them!
+            messages.send(
+                Message(MessageType::Heartbeat, datagram.ip, get_self_mac_address(), get_self_hostname(), SEND_PORT));
             break;
 
         // TODO: Handle the rest of the cases
@@ -123,7 +147,8 @@ void find_manager(Atomic<ParticipantTable> &participants, Channel<Message> &mess
     {
         // TODO: Sending do IP 127.0.0.1 to work on localhost,
         //       to make broadcast, we need to send to 255.255.255.255
-        Message message(MessageType::LookingForLeader, "255.255.255.255", get_self_mac_address(), SEND_PORT);
+        Message message(MessageType::LookingForLeader, "255.255.255.255", get_self_mac_address(), get_self_hostname(),
+                        SEND_PORT);
         messages.send(message);
 
         this_thread::sleep_for(500ms);
@@ -152,7 +177,7 @@ void command_subservice(Atomic<ParticipantTable> &participants, Channel<Message>
             string hostname = args[1];
             // TODO: find the mac address searching in table by hostname
             // string mac = participants.find_by_hostname(hostname);
-            Message message(MessageType::WakeupRequest, "0.0.0.0", "a4:5d:36:c2:bb:91", 9);
+            Message message(MessageType::WakeupRequest, "0.0.0.0", "a4:5d:36:c2:bb:91", "foobar", 9);
             messages.send(message);
 
             cout << "[info] wakeonlan sent!" << endl;
@@ -187,6 +212,28 @@ void interface_subservice(Atomic<ParticipantTable> &participants, Channel<None> 
     }
 }
 
+void monitoring_subservice(Atomic<ParticipantTable> &participants, Channel<Message> &messages, Channel<None> &running)
+{
+    while (running.is_open())
+    {
+        // TODO: skip if I'm not the manager
+        participants.with([&](ParticipantTable &participants) {
+            auto now = chrono::system_clock::now();
+            for (auto &member : participants.get_participants())
+            {
+                auto time_diff = now - member.last_time_seen_alive;
+                if (time_diff > 1s)
+                {
+                    messages.send(Message(MessageType::HeartbeatRequest, member.ip_address, member.mac_address,
+                                          get_self_hostname(), SEND_PORT));
+                }
+            }
+        });
+
+        this_thread::sleep_for(101ms);
+    }
+}
+
 bool has_manager_role(int argc, char *argv[])
 {
     if (argc > 1)
@@ -213,6 +260,7 @@ int main(int argc, char *argv[])
         thread(message_receiver, ref(participants), ref(running), ref(socket), ref(messages), is_manager));
     threads.push_back(thread(message_sender, ref(messages), ref(socket)));
     threads.push_back(thread(interface_subservice, ref(participants), ref(running)));
+    threads.push_back(thread(command_subservice, ref(participants), ref(messages), ref(running)));
     threads.push_back(thread(command_subservice, ref(participants), ref(messages), ref(running)));
 
     if (is_manager)

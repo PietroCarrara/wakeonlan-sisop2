@@ -14,13 +14,18 @@ enum struct MessageType
     Heartbeat,
     WakeupRequest,
     LookingForLeader,
-    IAmTheLeader
+    IAmTheLeader,
+    HeartbeatRequest,
 };
 
 /**
  * Message members will be enconded in csv format, for example:
- * message_type = 3, ip = 1.2.3.4, mac_address = 55:55:55:55:55:55, port = 666
- * encoded message: "3;1.2.3.4;55:55:55:55:55:55;666"
+ * message_type = 3 
+ * ip = 1.2.3.4
+ * mac_address = 55:55:55:55:55:55
+ * sender_hostname = h-666.6.6
+ * port = 777
+ * encoded message: "3;1.2.3.4;55:55:55:55:55:55;h-666.6.6;777"
  * */
 class Message
 {
@@ -28,14 +33,16 @@ class Message
     MessageType _message_type;
     string _ip;
     string _mac_address;
+    string _sender_hostname;
     int _port;
 
   public:
-    Message(MessageType message_type, string ip, string mac_address, int port);
+    Message(MessageType message_type, string ip, string mac_address, string sender_hostname, int port);
 
     MessageType get_message_type();
     string get_ip();
     string get_mac_address();
+    string get_sender_hostname();
     int get_port();
 
     static Message decode(string data);

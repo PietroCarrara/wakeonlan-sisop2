@@ -36,6 +36,8 @@ class ParticipantTable
     void print();
 
     void add_or_update_participant(Participant participant);
+
+    vector<Participant> get_participants();
 };
 
 #endif

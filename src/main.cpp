@@ -261,7 +261,7 @@ int main(int argc, char *argv[])
     threads.push_back(thread(message_sender, ref(messages), ref(socket)));
     threads.push_back(thread(interface_subservice, ref(participants), ref(running)));
     threads.push_back(thread(command_subservice, ref(participants), ref(messages), ref(running)));
-    threads.push_back(thread(command_subservice, ref(participants), ref(messages), ref(running)));
+    threads.push_back(thread(monitoring_subservice, ref(participants), ref(messages), ref(running)));
 
     if (is_manager)
     {

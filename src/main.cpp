@@ -24,6 +24,22 @@ struct None
 {
 };
 
+string get_self_mac_address()
+{
+    // TODO: see what interface we use in labs ('eth0' or 'wlo1' or something else)
+    string get_mac_command = "/sbin/ip link show eth0 | awk '/ether/{print $2}'";
+    char buffer[17];
+
+    string result = "";
+
+    FILE *pipe = popen(get_mac_command.c_str(), "r");
+    while (fgets(buffer, 17, pipe) != NULL)
+        result += buffer;
+    pclose(pipe);
+
+    return result;
+}
+
 void message_sender(Channel<Message> &messages, Socket &socket)
 {
     while (auto msg_maybe = messages.receive())
@@ -78,7 +94,7 @@ void message_receiver(Atomic<ParticipantTable> &table, Channel<None> &running, S
             if (is_manager)
             {
                 cout << "hey there, " << message.get_mac_address() << ", I'm the leader!" << endl;
-                messages.send(Message(MessageType::IAmTheLeader, datagram.ip, message.get_mac_address(), SEND_PORT));
+                messages.send(Message(MessageType::IAmTheLeader, datagram.ip, get_self_mac_address(), SEND_PORT));
             }
             break;
 
@@ -104,22 +120,6 @@ void find_manager(Atomic<ParticipantTable> &participants, Channel<Message> &mess
 
         this_thread::sleep_for(500ms);
     }
-}
-
-string get_self_mac_address()
-{
-    // TODO: see what interface we use in labs ('eth0' or 'wlo1' or something else)
-    string get_mac_command = "/sbin/ip link show eth0 | awk '/ether/{print $2}'";
-    char buffer[17];
-
-    string result = "";
-
-    FILE *pipe = popen(get_mac_command.c_str(), "r");
-    while (fgets(buffer, 17, pipe) != NULL)
-        result += buffer;
-    pclose(pipe);
-
-    return result;
 }
 
 void setup_manager(Atomic<ParticipantTable> &participants)

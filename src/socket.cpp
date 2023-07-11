@@ -80,6 +80,11 @@ optional<Datagram> Socket::receive()
 {
     lock.lock();
     optional<Datagram> result = core_receive(socket_file_descriptor);
+    if (result && result.value().data == "ACK")
+    {
+        lock.unlock();
+        return {};
+    }
     if (result)
     {
         auto received = result.value();

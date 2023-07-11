@@ -3,6 +3,7 @@
 
 #include <string.h>
 
+#include "stringExtensions.h"
 #include <iostream>
 #include <vector>
 
@@ -28,8 +29,6 @@ class Message
     string _ip;
     string _mac_address;
     int _port;
-
-    static vector<string> split(string str, char separator);
 
   public:
     Message(MessageType message_type, string ip, string mac_address, int port);

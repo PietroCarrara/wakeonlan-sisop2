@@ -1,30 +1,10 @@
 
 #include "message.h"
 
-// Private:
-vector<string> Message::split(string str, char separator)
-{
-    size_t start_index = 0, separator_index;
-    string token;
-    vector<string> tokens;
-
-    while ((separator_index = str.find(separator, start_index)) != string::npos)
-    {
-        token = str.substr(start_index, separator_index - start_index);
-        start_index = separator_index + 1; // add 1 to skip the separator
-        tokens.push_back(token);
-    }
-
-    tokens.push_back(str.substr(start_index));
-    return tokens;
-}
-
-// Public:
-
 Message Message::decode(string data)
 {
     // For now, we assume the data will allways arrive with the desired format
-    vector<string> data_tokens = split(data, ';');
+    vector<string> data_tokens = StringExtensions::split(data, ';');
 
     MessageType message_type = static_cast<MessageType>(stoi(data_tokens[0]));
     string ip = data_tokens[1];

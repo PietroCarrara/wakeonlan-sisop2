@@ -11,8 +11,9 @@
 #include "atomic.h"
 #include "channel.h"
 #include "message.h"
-#include "participant_table.h"
+#include "participantTable.h"
 #include "socket.h"
+#include "stringExtensions.h"
 
 constexpr Port SEND_PORT = 5000;
 constexpr Port RECEIVE_PORT = 5001;
@@ -88,12 +89,13 @@ void message_receiver(Atomic<ParticipantTable> &table, Channel<None> &running, S
     }
 }
 
-void find_manager(Atomic<ParticipantTable> &participants, Channel<Message> &messages)
+void find_manager(Atomic<ParticipantTable> &participants, Channel<Message> &messages, Channel<None> &running)
 {
     cout << "looking for leader" << endl << endl;
 
-    while (participants.compute(
-        [&](ParticipantTable &participants) { return !participants.get_manager_mac_address().has_value(); }))
+    while (running.is_open() && participants.compute([&](ParticipantTable &participants) {
+        return !participants.get_manager_mac_address().has_value();
+    }))
     {
         // TODO: Sending do IP 127.0.0.1 to work on localhost,
         //       to make broadcast, we need to send to 255.255.255.255
@@ -131,22 +133,23 @@ void command_subservice(Atomic<ParticipantTable> &participants, Channel<Message>
 {
     string input;
 
-    cout << "> ";
-
     while (running.is_open())
     {
         cin >> input;
+        vector<string> args = StringExtensions::split(input, ' ');
+        string command = StringExtensions::to_upper(args[0]);
 
-        if (input == "WAKEUP")
+        if (command == "WAKEUP")
         {
-            cout << "[cmd] wakeonlan a4:5d:36:c2:bb:91" << endl;
-
+            string hostname = args[1];
+            // TODO: find the mac address searching in table by hostname
+            // string mac = participants.find_by_hostname(hostname);
             Message message(MessageType::WakeupRequest, "0.0.0.0", "a4:5d:36:c2:bb:91", 9);
             messages.send(message);
 
             cout << "[info] wakeonlan sent!" << endl;
         }
-        else if (input == "EXIT")
+        else if (command == "EXIT")
         {
             running.close();
         }
@@ -210,7 +213,7 @@ int main(int argc, char *argv[])
     }
     else
     {
-        find_manager(participants, messages);
+        find_manager(participants, messages, running);
     }
 
     while (running.is_open())

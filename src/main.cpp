@@ -27,13 +27,13 @@ struct None
 string get_self_mac_address()
 {
     // TODO: see what interface we use in labs ('eth0' or 'wlo1' or something else)
-    string get_mac_command = "/sbin/ip link show eth0 | awk '/ether/{print $2}'";
+    string get_mac_command = "/sbin/ip link show eth0 | awk '/ether/{print $2}' | tr -d '\\n'";
     char buffer[17];
 
     string result = "";
 
     FILE *pipe = popen(get_mac_command.c_str(), "r");
-    while (fgets(buffer, 17, pipe) != NULL)
+    while (fgets(buffer, sizeof(buffer), pipe) != NULL)
         result += buffer;
     pclose(pipe);
 
@@ -94,6 +94,14 @@ void message_receiver(Atomic<ParticipantTable> &table, Channel<None> &running, S
             if (is_manager)
             {
                 cout << "hey there, " << message.get_mac_address() << ", I'm the leader!" << endl;
+                table.with([&](ParticipantTable& table) {
+                    table.add_or_update_participant(Participant{
+                        .hostname = "seloko",
+                        .mac_address = message.get_mac_address(),
+                        .ip_address = datagram.ip,
+                        .last_time_seen_alive = chrono::system_clock::now(),
+                    });
+                });
                 messages.send(Message(MessageType::IAmTheLeader, datagram.ip, get_self_mac_address(), SEND_PORT));
             }
             break;

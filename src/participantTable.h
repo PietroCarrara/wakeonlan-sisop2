@@ -34,6 +34,8 @@ class ParticipantTable
     ParticipantTable clone();
 
     void print();
+
+    void add_or_update_participant(Participant participant);
 };
 
 #endif

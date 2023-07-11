@@ -66,8 +66,8 @@ void ParticipantTable::print()
 
     string parsed_manager_mac_address = manager_mac_address ? manager_mac_address.value() : "No Leader MAC Address";
 
-    cout << "Table" << endl;
-    cout << "Leader MAC Address: " << parsed_manager_mac_address << endl;
+    system("clear");
+    cout << "Leader MAC Address: " << parsed_manager_mac_address << endl << endl;
     cout << "Participants:" << endl;
     cout << "|";
 
@@ -107,4 +107,16 @@ void ParticipantTable::print()
         cout << '|' << " " << put_time(localtime(&last_time_seen_alive), "%Y-%m-%d %H:%M:%S") << "  " << '|' << endl
              << endl;
     }
+}
+
+void ParticipantTable::add_or_update_participant(Participant participant) {
+    for (auto i = 0; i < participants.size(); i++) {
+        auto member = participants[i];
+        if (member.ip_address == participant.ip_address) {
+            participants[i] = participant;
+            return;
+        }
+    }
+    
+    participants.push_back(participant);
 }

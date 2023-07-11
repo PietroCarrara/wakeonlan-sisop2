@@ -16,7 +16,7 @@
 #include "stringExtensions.h"
 
 constexpr Port SEND_PORT = 5000;
-constexpr Port RECEIVE_PORT = 5001;
+constexpr Port RECEIVE_PORT = 5000;
 
 using namespace std;
 
@@ -99,7 +99,7 @@ void find_manager(Atomic<ParticipantTable> &participants, Channel<Message> &mess
     {
         // TODO: Sending do IP 127.0.0.1 to work on localhost,
         //       to make broadcast, we need to send to 255.255.255.255
-        Message message(MessageType::LookingForLeader, "127.0.0.1", "", SEND_PORT);
+        Message message(MessageType::LookingForLeader, "255.255.255.255", "", SEND_PORT);
         messages.send(message);
 
         this_thread::sleep_for(500ms);
@@ -109,7 +109,7 @@ void find_manager(Atomic<ParticipantTable> &participants, Channel<Message> &mess
 string get_self_mac_address()
 {
     // TODO: see what interface we use in labs ('eth0' or 'wlo1' or something else)
-    string get_mac_command = "/sbin/ip link show wlo1 | awk '/ether/{print $2}'";
+    string get_mac_command = "/sbin/ip link show eth0 | awk '/ether/{print $2}'";
     char buffer[17];
 
     string result = "";

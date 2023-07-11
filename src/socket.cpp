@@ -55,11 +55,16 @@ void Socket::open()
     }
 
     struct timeval tv;
+    int enabled = 1;
     tv.tv_sec = 0;
     tv.tv_usec = 100 * 1000; // milliseconds * 1000 = microseconds
     if (setsockopt(socket_file_descriptor, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0)
     {
         printf("*** Error setting socket timeout ***");
+    }
+    if (setsockopt(socket_file_descriptor, SOL_SOCKET, SO_BROADCAST, &enabled, sizeof(enabled)) < 0)
+    {
+        printf("*** Error setting socket to enable broadcast ***");
     }
 
     server_address.sin_family = AF_INET;

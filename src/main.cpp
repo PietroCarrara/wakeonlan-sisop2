@@ -115,7 +115,7 @@ void find_manager(Atomic<ParticipantTable> &participants, Channel<Message> &mess
     {
         // TODO: Sending do IP 127.0.0.1 to work on localhost,
         //       to make broadcast, we need to send to 255.255.255.255
-        Message message(MessageType::LookingForLeader, "255.255.255.255", "", SEND_PORT);
+        Message message(MessageType::LookingForLeader, "255.255.255.255", get_self_mac_address(), SEND_PORT);
         messages.send(message);
 
         this_thread::sleep_for(500ms);

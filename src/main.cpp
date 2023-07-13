@@ -55,8 +55,13 @@ void message_sender(Channel<Message> &messages, Socket &socket)
         string wakeonlan_command = "wakeonlan " + msg.get_mac_address();
 
         Datagram packet = Datagram{.data = data, .ip = msg.get_ip()};
-        // TODO: Check if important messages are sent successfuly, such as wakeupRequest
-        socket.send(packet, SEND_PORT);
+
+        // Try 10 times
+        int i = 0;
+        while (!socket.send(packet, SEND_PORT) && i < 10)
+        {
+            i++;
+        }
     }
 }
 

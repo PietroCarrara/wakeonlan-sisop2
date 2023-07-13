@@ -38,6 +38,9 @@ class ParticipantTable
     void add_or_update_participant(Participant participant);
 
     vector<Participant> get_participants();
+
+    optional<Participant> get_manager();
+    optional<Participant> find_by_hostname(string hostname);
 };
 
 #endif

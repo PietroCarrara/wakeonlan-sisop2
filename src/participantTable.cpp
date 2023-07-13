@@ -109,18 +109,53 @@ void ParticipantTable::print()
     cout << endl;
 }
 
-void ParticipantTable::add_or_update_participant(Participant participant) {
-    for (long unsigned int i = 0; i < participants.size(); i++) {
+void ParticipantTable::add_or_update_participant(Participant participant)
+{
+    for (long unsigned int i = 0; i < participants.size(); i++)
+    {
         auto member = participants[i];
-        if (member.ip_address == participant.ip_address) {
+        if (member.ip_address == participant.ip_address)
+        {
             participants[i] = participant;
             return;
         }
     }
-    
+
     participants.push_back(participant);
 }
 
-vector<Participant> ParticipantTable::get_participants() {
+vector<Participant> ParticipantTable::get_participants()
+{
     return participants;
+}
+
+optional<Participant> ParticipantTable::get_manager()
+{
+    if (!manager_mac_address)
+    {
+        return {};
+    }
+
+    for (auto &participant : participants)
+    {
+        if (participant.mac_address == manager_mac_address.value())
+        {
+            return participant;
+        }
+    }
+
+    return {};
+}
+
+optional<Participant> ParticipantTable::find_by_hostname(string hostname)
+{
+    for (auto &participant : participants)
+    {
+        if (participant.hostname == hostname)
+        {
+            return participant;
+        }
+    }
+
+    return {};
 }

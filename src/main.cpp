@@ -54,17 +54,9 @@ void message_sender(Channel<Message> &messages, Socket &socket)
         string data = msg.encode();
         string wakeonlan_command = "wakeonlan " + msg.get_mac_address();
 
-        switch (msg.get_message_type())
-        {
-        case MessageType::WakeupRequest:
-            // HACK: This is easier than crafting an wake-on-lan UDP packet >:)
-            system(wakeonlan_command.c_str());
-            break;
-        default:
-            Datagram packet = Datagram{.data = data, .ip = msg.get_ip()};
-            bool success = socket.send(packet, SEND_PORT);
-            break;
-        }
+        Datagram packet = Datagram{.data = data, .ip = msg.get_ip()};
+        // TODO: Check if important messages are sent successfuly, such as wakeupRequest
+        socket.send(packet, SEND_PORT);
     }
 }
 
@@ -83,10 +75,21 @@ void message_receiver(Atomic<ParticipantTable> &table, Channel<None> &running, S
 
         Message message = Message::decode(datagram.data);
 
+        string wakeonlan_command;
+        optional<Participant> wakeonlan_target;
+
         switch (message.get_message_type())
         {
         case MessageType::IAmTheLeader:
-            table.with([&](ParticipantTable &table) { table.set_manager_mac_address(message.get_mac_address()); });
+            table.with([&](ParticipantTable &table) {
+                table.set_manager_mac_address(message.get_mac_address());
+                table.add_or_update_participant(Participant{
+                    .hostname = message.get_sender_hostname(),
+                    .mac_address = message.get_mac_address(),
+                    .ip_address = datagram.ip,
+                    .last_time_seen_alive = chrono::system_clock::now(),
+                });
+            });
             break;
 
         case MessageType::LookingForLeader:
@@ -122,7 +125,21 @@ void message_receiver(Atomic<ParticipantTable> &table, Channel<None> &running, S
                 Message(MessageType::Heartbeat, datagram.ip, get_self_mac_address(), get_self_hostname(), SEND_PORT));
             break;
 
-        // TODO: Handle the rest of the cases
+        case MessageType::WakeupRequest:
+            // HACK: On the wakeuprequest message, the "hostname" field is not the sender's hostname,
+            // but the hostname of the machine we wish to wakeup
+            wakeonlan_target = table.compute(
+                [&](ParticipantTable &table) { return table.find_by_hostname(message.get_sender_hostname()); });
+            if (!wakeonlan_target)
+            {
+                cout << "target " << message.get_sender_hostname() << " could not be found on participants table."
+                     << endl;
+            }
+            // HACK: This is easier than crafting an wake-on-lan UDP packet >:)
+            wakeonlan_command = "wakeonlan " + wakeonlan_target.value().mac_address;
+            system(wakeonlan_command.c_str());
+            break;
+
         default:
             break;
         }
@@ -162,17 +179,29 @@ void command_subservice(Atomic<ParticipantTable> &participants, Channel<Message>
         vector<string> args = StringExtensions::split(input, ' ');
         string command = StringExtensions::to_upper(args[0]);
 
-        if (command == "WAKEUP")
+        if (command == "WAKEUP" && args.size() == 2)
         {
             string hostname = args[1];
-            // TODO: find the mac address searching in table by hostname
-            // string mac = participants.find_by_hostname(hostname);
-            Message message(MessageType::WakeupRequest, "0.0.0.0", "a4:5d:36:c2:bb:91", "foobar", 9);
+            optional<Participant> manager =
+                participants.compute([&](ParticipantTable &table) { return table.get_manager(); });
+
+            if (!manager)
+            {
+                cout << "Manager could not be found..." << endl;
+                continue;
+            }
+
+            Message message(MessageType::WakeupRequest, manager.value().ip_address, get_self_mac_address(), hostname,
+                            SEND_PORT);
             messages.send(message);
         }
         else if (command == "EXIT")
         {
             running.close();
+        }
+        else
+        {
+            cout << "Comando inválido" << endl;
         }
     }
 }

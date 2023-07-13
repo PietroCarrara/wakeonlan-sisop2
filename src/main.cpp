@@ -56,7 +56,6 @@ void message_sender(Channel<Message> &messages, Socket &socket)
         string wakeonlan_command = "wakeonlan " + msg.get_mac_address();
 
         Datagram packet = Datagram{.data = data, .ip = msg.get_ip()};
-        cout << "Sending to " << packet.ip << ":" << SEND_PORT << endl;
 
         int i = 0;
         switch (msg.get_message_type())
@@ -102,8 +101,6 @@ void message_receiver(Atomic<ParticipantTable> &table, Channel<None> &running, S
             continue;
         }
         Datagram datagram = datagram_option.value();
-
-        cout << "Receiving from " << datagram.ip << ":" << RECEIVE_PORT;
 
         Message message = Message::decode(datagram.data);
 

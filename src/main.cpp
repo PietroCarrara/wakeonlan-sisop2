@@ -55,12 +55,21 @@ void message_sender(Channel<Message> &messages, Socket &socket)
         string wakeonlan_command = "wakeonlan " + msg.get_mac_address();
 
         Datagram packet = Datagram{.data = data, .ip = msg.get_ip()};
-
-        // Try 10 times
         int i = 0;
-        while (!socket.send(packet, SEND_PORT) && i < 10)
+
+        switch (msg.get_message_type())
         {
-            i++;
+        // Only important messages should be resent
+        case MessageType::WakeupRequest:
+            // Try 10 times
+            while (!socket.send(packet, SEND_PORT) && i < 10)
+            {
+                i++;
+            }
+            break;
+        default:
+            socket.send(packet, SEND_PORT);
+            break;
         }
     }
 }

@@ -7,6 +7,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <csignal>
 
 #include "atomic.h"
 #include "channel.h"
@@ -274,10 +275,36 @@ bool has_manager_role(int argc, char *argv[])
     return false;
 }
 
+bool received_sigint = false;
+
+void signal_handler(int signal_number)
+{
+    received_sigint = true;
+}
+
+void graceful_shutdown(Atomic<ParticipantTable> &participants, Channel<Message> &messages, Channel<None> &running, bool is_manager)
+{
+    signal(SIGINT, signal_handler);
+
+    // TODO: shutdown on CTRL+D
+
+    while (running.is_open())
+    {
+        if(!received_sigint) continue;
+
+        running.close();
+    }
+
+    if (is_manager) return;
+
+    // TODO: send exit message to leader
+}
+
 int main(int argc, char *argv[])
 {
     Atomic<ParticipantTable> participants;
     vector<thread> threads;
+    vector<thread> detach_threads;
 
     Channel<None> running;
     Channel<Message> messages;
@@ -302,8 +329,10 @@ int main(int argc, char *argv[])
         thread(message_receiver, ref(participants), ref(running), ref(socket), ref(messages), is_manager));
     threads.push_back(thread(message_sender, ref(messages), ref(socket)));
     threads.push_back(thread(interface_subservice, ref(participants), ref(running)));
-    threads.push_back(thread(command_subservice, ref(participants), ref(messages), ref(running)));
     threads.push_back(thread(monitoring_subservice, ref(participants), ref(messages), ref(running)));
+    threads.push_back(thread(graceful_shutdown, ref(participants), ref(messages), ref(running), is_manager));
+
+    detach_threads.push_back(thread(command_subservice, ref(participants), ref(messages), ref(running)));
 
     if (is_manager)
     {
@@ -322,9 +351,17 @@ int main(int argc, char *argv[])
     // Close channels
     messages.close();
 
+    // detach everyone
+    for (auto &thread : detach_threads)
+    {
+        thread.detach();
+    }
+
     // Wait everyone
     for (auto &thread : threads)
     {
         thread.join();
     }
+
+    return 0;
 }

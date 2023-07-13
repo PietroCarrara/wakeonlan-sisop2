@@ -32,15 +32,14 @@ optional<Datagram> core_receive(int socket_file_descriptor)
         return {};
     }
 
-    printf("Received a datagram: %s\n", buf);
-
     string ip(inet_ntoa(sender_address.sin_addr));
     string data(buf);
     struct Datagram result = {.data = data, .ip = ip};
     return result;
 }
 
-Socket::Socket(Port receive_port, Port send_port) {
+Socket::Socket(Port receive_port, Port send_port)
+{
     this->receive_port = receive_port;
     this->send_port = send_port;
 }
@@ -101,12 +100,9 @@ bool Socket::send(Datagram packet, Port port)
 {
     lock.lock();
     core_send(socket_file_descriptor, packet, port);
+    // Wait ack from destination
     // TODO: Receive only from a specific IP
     optional<Datagram> result = core_receive(socket_file_descriptor);
-    if (result) {
-        cout << result.value().ip << " " << result.value().data << endl;
-    }
-    // Wait ack from destination
     lock.unlock();
 
     return result.has_value() && result.value().ip == packet.ip && result.value().data == "ACK";

@@ -54,20 +54,15 @@ void message_sender(Channel<Message> &messages, Socket &socket)
         string data = msg.encode();
         string wakeonlan_command = "wakeonlan " + msg.get_mac_address();
 
-        cout << "sending to " << msg.get_ip() << ":" << msg.get_port() << endl;
-
         switch (msg.get_message_type())
         {
         case MessageType::WakeupRequest:
             // HACK: This is easier than crafting an wake-on-lan UDP packet >:)
-            cout << "Mandando wakeonlan" << endl;
             system(wakeonlan_command.c_str());
-            cout << "wakeonlan mandado" << endl;
             break;
         default:
             Datagram packet = Datagram{.data = data, .ip = msg.get_ip()};
             bool success = socket.send(packet, SEND_PORT);
-            cout << "send was successful: " << success << endl;
             break;
         }
     }
@@ -88,8 +83,6 @@ void message_receiver(Atomic<ParticipantTable> &table, Channel<None> &running, S
 
         Message message = Message::decode(datagram.data);
 
-        cout << "got message!" << endl;
-
         switch (message.get_message_type())
         {
         case MessageType::IAmTheLeader:
@@ -99,7 +92,6 @@ void message_receiver(Atomic<ParticipantTable> &table, Channel<None> &running, S
         case MessageType::LookingForLeader:
             if (is_manager)
             {
-                cout << "hey there, " << message.get_mac_address() << ", I'm the leader!" << endl;
                 table.with([&](ParticipantTable &table) {
                     table.add_or_update_participant(Participant{
                         .hostname = message.get_sender_hostname(),
@@ -139,8 +131,6 @@ void message_receiver(Atomic<ParticipantTable> &table, Channel<None> &running, S
 
 void find_manager(Atomic<ParticipantTable> &participants, Channel<Message> &messages, Channel<None> &running)
 {
-    cout << "looking for leader" << endl << endl;
-
     while (running.is_open() && participants.compute([&](ParticipantTable &participants) {
         return !participants.get_manager_mac_address().has_value();
     }))
@@ -179,8 +169,6 @@ void command_subservice(Atomic<ParticipantTable> &participants, Channel<Message>
             // string mac = participants.find_by_hostname(hostname);
             Message message(MessageType::WakeupRequest, "0.0.0.0", "a4:5d:36:c2:bb:91", "foobar", 9);
             messages.send(message);
-
-            cout << "[info] wakeonlan sent!" << endl;
         }
         else if (command == "EXIT")
         {

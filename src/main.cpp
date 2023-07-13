@@ -175,7 +175,7 @@ void command_subservice(Atomic<ParticipantTable> &participants, Channel<Message>
 
     while (running.is_open())
     {
-        cin >> input;
+        std::getline(std::cin, input);
         vector<string> args = StringExtensions::split(input, ' ');
         string command = StringExtensions::to_upper(args[0]);
 

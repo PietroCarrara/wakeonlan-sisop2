@@ -267,6 +267,16 @@ int main(int argc, char *argv[])
     Channel<None> running;
     Channel<Message> messages;
 
+    // Add ourselves to the table
+    participants.with([&](ParticipantTable &table) {
+        table.add_or_update_participant(Participant{
+            .hostname = get_self_hostname(),
+            .mac_address = get_self_mac_address(),
+            .ip_address = "127.0.0.1",
+            .last_time_seen_alive = chrono::system_clock::now(),
+        });
+    });
+
     Socket socket(RECEIVE_PORT, SEND_PORT);
     socket.open();
 

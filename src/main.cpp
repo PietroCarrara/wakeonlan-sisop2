@@ -134,6 +134,7 @@ void message_receiver(Atomic<ParticipantTable> &table, Channel<None> &running, S
             {
                 cout << "target " << message.get_sender_hostname() << " could not be found on participants table."
                      << endl;
+                continue;
             }
             // HACK: This is easier than crafting an wake-on-lan UDP packet >:)
             wakeonlan_command = "wakeonlan " + wakeonlan_target.value().mac_address;

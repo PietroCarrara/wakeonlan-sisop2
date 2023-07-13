@@ -1,4 +1,5 @@
 #include <chrono>
+#include <csignal>
 #include <future>
 #include <iomanip>
 #include <iostream>
@@ -7,7 +8,6 @@
 #include <string>
 #include <thread>
 #include <vector>
-#include <csignal>
 
 #include "atomic.h"
 #include "channel.h"
@@ -294,7 +294,7 @@ void signal_handler(int signal_number)
     received_sigint = true;
 }
 
-void graceful_shutdown(Atomic<ParticipantTable> &participants, Channel<Message> &messages, Channel<None> &running, bool is_manager)
+void graceful_shutdown(Atomic<ParticipantTable> &participants, Channel<Message> &messages, Channel<None> &running)
 {
     signal(SIGINT, signal_handler);
 
@@ -302,12 +302,14 @@ void graceful_shutdown(Atomic<ParticipantTable> &participants, Channel<Message> 
 
     while (running.is_open())
     {
-        if(!received_sigint) continue;
+        if (!received_sigint)
+            continue;
 
         running.close();
     }
 
-    if (is_manager) return;
+    if (participants.compute(([&](ParticipantTable &table) { return table.is_self_manager(); })))
+        return;
 
     // TODO: send exit message to leader
 }
@@ -341,7 +343,7 @@ int main(int argc, char *argv[])
     threads.push_back(thread(message_sender, ref(messages), ref(socket)));
     threads.push_back(thread(interface_subservice, ref(participants), ref(running)));
     threads.push_back(thread(monitoring_subservice, ref(participants), ref(messages), ref(running)));
-    threads.push_back(thread(graceful_shutdown, ref(participants), ref(messages), ref(running), is_manager));
+    threads.push_back(thread(graceful_shutdown, ref(participants), ref(messages), ref(running)));
 
     detach_threads.push_back(thread(command_subservice, ref(participants), ref(messages), ref(running)));
 

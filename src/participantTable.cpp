@@ -7,6 +7,11 @@ void ParticipantTable::set_manager_mac_address(string mac_address)
     manager_mac_address = mac_address;
 }
 
+void ParticipantTable::set_self(Participant self)
+{
+    this->self = self;
+}
+
 optional<string> ParticipantTable::get_manager_mac_address()
 {
     return manager_mac_address;
@@ -35,6 +40,11 @@ bool ParticipantTable::is_equal_to(ParticipantTable &table_cmp)
     }
 
     return true;
+}
+
+bool ParticipantTable::is_self_manager()
+{
+    return manager_mac_address && manager_mac_address.value() == self.mac_address;
 }
 
 ParticipantTable ParticipantTable::clone()
@@ -136,6 +146,11 @@ optional<Participant> ParticipantTable::get_manager()
         return {};
     }
 
+    if (self.mac_address == manager_mac_address.value())
+    {
+        return self;
+    }
+
     for (auto &participant : participants)
     {
         if (participant.mac_address == manager_mac_address.value())
@@ -149,6 +164,11 @@ optional<Participant> ParticipantTable::get_manager()
 
 optional<Participant> ParticipantTable::find_by_hostname(string hostname)
 {
+    if (self.hostname == hostname)
+    {
+        return self;
+    }
+
     for (auto &participant : participants)
     {
         if (participant.hostname == hostname)

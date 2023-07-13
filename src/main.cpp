@@ -56,8 +56,9 @@ void message_sender(Channel<Message> &messages, Socket &socket)
         string wakeonlan_command = "wakeonlan " + msg.get_mac_address();
 
         Datagram packet = Datagram{.data = data, .ip = msg.get_ip()};
-        int i = 0;
+        cout << "Sending to " << packet.ip << ":" << SEND_PORT << endl;
 
+        int i = 0;
         switch (msg.get_message_type())
         {
         // Only important messages should be resent
@@ -75,8 +76,22 @@ void message_sender(Channel<Message> &messages, Socket &socket)
     }
 }
 
+void wake_on_lan(string hostname, Atomic<ParticipantTable> &table)
+{
+    optional<Participant> wakeonlan_target =
+        table.compute([&](ParticipantTable &table) { return table.find_by_hostname(hostname); });
+    if (!wakeonlan_target)
+    {
+        cout << "target " << hostname << " could not be found on participants table." << endl;
+        return;
+    }
+    // HACK: This is easier than crafting an wake-on-lan UDP packet >:)
+    string wakeonlan_command = "wakeonlan " + wakeonlan_target.value().mac_address;
+    system(wakeonlan_command.c_str());
+}
+
 void message_receiver(Atomic<ParticipantTable> &table, Channel<None> &running, Socket &socket,
-                      Channel<Message> &messages, bool is_manager)
+                      Channel<Message> &messages)
 {
     while (running.is_open())
     {
@@ -88,10 +103,9 @@ void message_receiver(Atomic<ParticipantTable> &table, Channel<None> &running, S
         }
         Datagram datagram = datagram_option.value();
 
-        Message message = Message::decode(datagram.data);
+        cout << "Receiving from " << datagram.ip << ":" << RECEIVE_PORT;
 
-        string wakeonlan_command;
-        optional<Participant> wakeonlan_target;
+        Message message = Message::decode(datagram.data);
 
         switch (message.get_message_type())
         {
@@ -108,7 +122,7 @@ void message_receiver(Atomic<ParticipantTable> &table, Channel<None> &running, S
             break;
 
         case MessageType::LookingForLeader:
-            if (is_manager)
+            if (table.compute(([&](ParticipantTable &table) { return table.is_self_manager(); })))
             {
                 table.with([&](ParticipantTable &table) {
                     table.add_or_update_participant(Participant{
@@ -143,17 +157,7 @@ void message_receiver(Atomic<ParticipantTable> &table, Channel<None> &running, S
         case MessageType::WakeupRequest:
             // HACK: On the wakeuprequest message, the "hostname" field is not the sender's hostname,
             // but the hostname of the machine we wish to wakeup
-            wakeonlan_target = table.compute(
-                [&](ParticipantTable &table) { return table.find_by_hostname(message.get_sender_hostname()); });
-            if (!wakeonlan_target)
-            {
-                cout << "target " << message.get_sender_hostname() << " could not be found on participants table."
-                     << endl;
-                continue;
-            }
-            // HACK: This is easier than crafting an wake-on-lan UDP packet >:)
-            wakeonlan_command = "wakeonlan " + wakeonlan_target.value().mac_address;
-            system(wakeonlan_command.c_str());
+            wake_on_lan(message.get_sender_hostname(), table);
             break;
 
         default:
@@ -207,9 +211,17 @@ void command_subservice(Atomic<ParticipantTable> &participants, Channel<Message>
                 continue;
             }
 
-            Message message(MessageType::WakeupRequest, manager.value().ip_address, get_self_mac_address(), hostname,
-                            SEND_PORT);
-            messages.send(message);
+            // Special case if we're the manager: directly send the wakeonlan command
+            if (participants.compute(([&](ParticipantTable &table) { return table.is_self_manager(); })))
+            {
+                wake_on_lan(hostname, participants);
+            }
+            else
+            {
+                Message message(MessageType::WakeupRequest, manager.value().ip_address, get_self_mac_address(),
+                                hostname, SEND_PORT);
+                messages.send(message);
+            }
         }
         else if (command == "EXIT")
         {
@@ -311,7 +323,7 @@ int main(int argc, char *argv[])
 
     // Add ourselves to the table
     participants.with([&](ParticipantTable &table) {
-        table.add_or_update_participant(Participant{
+        table.set_self(Participant{
             .hostname = get_self_hostname(),
             .mac_address = get_self_mac_address(),
             .ip_address = "127.0.0.1",
@@ -325,8 +337,7 @@ int main(int argc, char *argv[])
     bool is_manager = has_manager_role(argc, argv);
 
     // Spawn threads
-    threads.push_back(
-        thread(message_receiver, ref(participants), ref(running), ref(socket), ref(messages), is_manager));
+    threads.push_back(thread(message_receiver, ref(participants), ref(running), ref(socket), ref(messages)));
     threads.push_back(thread(message_sender, ref(messages), ref(socket)));
     threads.push_back(thread(interface_subservice, ref(participants), ref(running)));
     threads.push_back(thread(monitoring_subservice, ref(participants), ref(messages), ref(running)));

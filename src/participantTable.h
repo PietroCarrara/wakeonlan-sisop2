@@ -22,14 +22,17 @@ class ParticipantTable
   private:
     // The leader's MAC address. Empty if we haven't found it yet.
     optional<string> manager_mac_address;
+    Participant self;
     vector<Participant> participants;
 
   public:
     void set_manager_mac_address(string mac_address);
+    void set_self(Participant self);
 
     optional<string> get_manager_mac_address();
 
     bool is_equal_to(ParticipantTable &table_cmp);
+    bool is_self_manager();
 
     ParticipantTable clone();
 

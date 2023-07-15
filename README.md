@@ -1,30 +1,73 @@
-## Ambiente de Desenvolvimento
+# Ambiente de Desenvolvimento
 
-O auto-complete e o comando de compilação já estão configurados pro VSCode, é só abrir a pasta.
+O auto-complete e o formatter já estão configurados para IDE VSCode.
 
-### Rodando
+# Rodando o programa
 
-Pra compilar no braço, basta rodar o comando `make`, ele irá compilar todos os arquivos e o resultado irá pasta build.
-Para rodar o programa, execute `make client` ou `make manager`
-Para limpar sua pasta de build, execute `make clear_build`
+### Compilação
 
-Apertando F5, a IDE compila e roda o programa em modo de debug. Para mudar se você quer rodar o cliente ou o servidor, navegue até o menu de debugging e selecione a configuração desejada:
+- Basta rodar o seguinte comando para gerar o executável, ele irá compilar todos os arquivos e o resultado irá pasta `build`
 
-![](./docs/debugging.png)
+```sh
+ make
+```
 
-## Padrões de Código
+- Caso queira limpar a pasta com os outputs, execute 
 
-O projeto não vai ser um troço enorme, então isso são menos regras e mais sugestões para tornar nossa vida menos miserável usando C++. Se sentir que burlá-los uma vez ou outra vai nos dar menos trabalho, vá em frente!
+```sh
+make clear_build
+```
 
-- Não use ponteiros, use referências. O compilador é mais exigente com elas, e você ganha a garantia que elas nunca serão nulas, pegando coisas que poderiam dar um `NullPointerException` em tempo de compilação.
+### Execução
+- **Recomendado**: Para criar uma instância de um cliente, execute
+
+```sh
+make client
+```
+
+- **Recomendado**: Para criar uma instância de um gerente, execute
+
+```sh
+make manager
+```
+
+- É possível também apenas chamar o executável do programa para criar um cliente
+
+```sh
+./build/wakeonlan 
+```
+
+- Para criar o gerente, execute o mesmo comando com parâmetro correto
+
+```sh
+./build/wakeonlan manager 
+```
+
+
+***
+
+# Padrões de Código
+
+- Sempre que possível, isole os componentes em classes separadas, agrupe funcionalidades que poderiam ser fornecidas para um mesmo recurso.
+- Faça um arquivo para cada classe, com os nomes `class_name.h` e `class_name.cpp`. É necessário apenas importar a nova bilioteca local no arquivo principal, a compilação feita pelo make se encarrega de compilar e linkar todos os arquivos. 
+- Especificamente sobre os headers `class_name.h`, devem possuir as definições de tipos e protótipos de funções, lembrando que **funções com template devem ficar no header**. 
+- Não use ponteiros, use referências. O compilador é mais exigente com elas e você ganha a garantia que elas nunca serão nulas, pegando coisas que poderiam dar um `NullPointerException` em tempo de compilação.
   - Então no lugar de declarar `int* ponteiro`, use `int& referencia`.
-- Não jogue exceptions. Em código multithreaded isso vira mais infernal que em código normal. Se sua função tem chance de falhar e não pode retornar o resultado esperado, mude seu retorno para usar um `optional`.
-  - `Status get_status_from_host() { ... }` vira `optional<Status> get_status_from_host() { ... }`.
-- *Eu preciso de uma thread que gera dados e uma que consome esses dados, como eu faço?* Pra resolver o problema do produtor/consumidor, vamos tentar usar **canais** até não dar mais (eu não sei onde surgiu a ideia, mas eu vi pela primeira vez em [golang](https://golangdocs.com/channels-in-golang)). São uma maneira de manter comunicação entre processos paralelos sem danificar a sanidade mental de quem está programando. Uma task põe coisas dentro dele, e outra vai tirando. Usa-se assim:
-  - A função "pai" dos processos cria um canal, e o passa como referência para duas (ou mais) funções paralelas
-  - Quando uma função põe dados no canal, se o canal já está carregando algum dado, ela fica bloqueada até que alguém pegue aquele dado na outra ponta.
-  - Quando uma função tenta pegar dados no canal, se não há nenhum, ela fica bloqueada até que alguém ponha algum dado na outra ponta.
+- Não jogue `exceptions`. Em código multithreaded isso vira mais infernal que em código normal. Se sua função tem chance de falhar e não pode retornar o resultado esperado, mude seu retorno para usar um `optional`, por exemplo:
 
-## Separação em Arquivos
+```cpp
+  Status get_status_from_host() { ... }
+```
 
-Todos os arquivos que não são a `main.cpp` devem conter um header (`exemplo.h`) com as definições de tipos e protótipos de funções, e um arquivo de código (`exemplo.c`) com essas implementações. **NOTA: FUNÇÕES COM TEMPLATE DEVEM FICAR NO .h!!!**
+Deve ser transformado em:
+
+```cpp
+optional<Status> get_status_from_host() { ... }
+```
+***
+> *"Eu preciso de uma thread que gera dados e uma que consome esses dados, como eu faço?"* 
+
+Pra resolver o problema do produtor/consumidor, usamos `canais` sempre como primeira opção (padrão visto em [golang](https://golangdocs.com/channels-in-golang)). Canais são uma maneira de manter comunicação entre processos paralelos sem danificar a sanidade mental de quem está programando. Uma task põe mensagens no canal e outra vai retirando. Usa-se assim:
+1. A função *"pai"* dos processos cria um canal e o passa como referência para duas (ou mais) funções paralelas
+2. Quando uma função põe dados no canal, caso ele já esteja carregando algum dado, ela fica bloqueada até que alguém pegue aquele dado na outra ponta.
+3. Quando uma função tenta pegar dados no canal, se não há nenhum, ela fica bloqueada até que alguém ponha algum dado na outra ponta.

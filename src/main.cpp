@@ -68,6 +68,13 @@ void message_sender(Channel<Message> &messages, Socket &socket)
                 i++;
             }
             break;
+        case MessageType::QuitingRequest:
+            // Try 10 times
+            while (!socket.send(packet, SEND_PORT) && i < 10)
+            {
+                i++;
+            }
+            break;
         default:
             socket.send(packet, SEND_PORT);
             break;
@@ -106,7 +113,7 @@ void message_receiver(Atomic<ParticipantTable> &table, Channel<None> &running, S
 
         switch (message.get_message_type())
         {
-        case MessageType::IAmTheLeader:
+        case MessageType::IAmTheManager:
             table.with([&](ParticipantTable &table) {
                 table.set_manager_mac_address(message.get_mac_address());
                 table.add_or_update_participant(Participant{
@@ -118,7 +125,7 @@ void message_receiver(Atomic<ParticipantTable> &table, Channel<None> &running, S
             });
             break;
 
-        case MessageType::LookingForLeader:
+        case MessageType::LookingForManager:
             if (table.compute(([&](ParticipantTable &table) { return table.is_self_manager(); })))
             {
                 table.with([&](ParticipantTable &table) {
@@ -129,7 +136,7 @@ void message_receiver(Atomic<ParticipantTable> &table, Channel<None> &running, S
                         .last_time_seen_alive = chrono::system_clock::now(),
                     });
                 });
-                messages.send(Message(MessageType::IAmTheLeader, datagram.ip, get_self_mac_address(),
+                messages.send(Message(MessageType::IAmTheManager, datagram.ip, get_self_mac_address(),
                                       get_self_hostname(), SEND_PORT));
             }
             break;
@@ -157,6 +164,11 @@ void message_receiver(Atomic<ParticipantTable> &table, Channel<None> &running, S
             wake_on_lan(message.get_sender_hostname(), table);
             break;
 
+        case MessageType::QuitingRequest:
+            table.with(
+                [&](ParticipantTable &table) { table.remove_participant_by_hostname(message.get_sender_hostname()); });
+            break;
+
         default:
             break;
         }
@@ -169,9 +181,7 @@ void find_manager(Atomic<ParticipantTable> &participants, Channel<Message> &mess
         return !participants.get_manager_mac_address().has_value();
     }))
     {
-        // TODO: Sending do IP 127.0.0.1 to work on localhost,
-        //       to make broadcast, we need to send to 255.255.255.255
-        Message message(MessageType::LookingForLeader, "255.255.255.255", get_self_mac_address(), get_self_hostname(),
+        Message message(MessageType::LookingForManager, "255.255.255.255", get_self_mac_address(), get_self_hostname(),
                         SEND_PORT);
         messages.send(message);
 
@@ -220,13 +230,13 @@ void command_subservice(Atomic<ParticipantTable> &participants, Channel<Message>
                 messages.send(message);
             }
         }
-        else if (command == "EXIT")
+        else if (command == "EXIT" || cin.eof())
         {
             running.close();
         }
         else
         {
-            cout << "Comando inválido" << endl;
+            cout << "Invalid command" << endl;
         }
     }
 }
@@ -258,16 +268,18 @@ void monitoring_subservice(Atomic<ParticipantTable> &participants, Channel<Messa
 {
     while (running.is_open())
     {
-        // TODO: skip if I'm not the manager
         participants.with([&](ParticipantTable &participants) {
-            auto now = chrono::system_clock::now();
-            for (auto &member : participants.get_participants())
+            if (participants.is_self_manager())
             {
-                auto time_diff = now - member.last_time_seen_alive;
-                if (time_diff > 1s)
+                auto now = chrono::system_clock::now();
+                for (auto &member : participants.get_participants())
                 {
-                    messages.send(Message(MessageType::HeartbeatRequest, member.ip_address, member.mac_address,
-                                          get_self_hostname(), SEND_PORT));
+                    auto time_diff = now - member.last_time_seen_alive;
+                    if (time_diff > 1s)
+                    {
+                        messages.send(Message(MessageType::HeartbeatRequest, member.ip_address, member.mac_address,
+                                              get_self_hostname(), SEND_PORT));
+                    }
                 }
             }
         });
@@ -295,8 +307,6 @@ void graceful_shutdown(Atomic<ParticipantTable> &participants, Channel<Message> 
 {
     signal(SIGINT, signal_handler);
 
-    // TODO: shutdown on CTRL+D
-
     while (running.is_open())
     {
         if (!received_sigint)
@@ -308,7 +318,10 @@ void graceful_shutdown(Atomic<ParticipantTable> &participants, Channel<Message> 
     if (participants.compute(([&](ParticipantTable &table) { return table.is_self_manager(); })))
         return;
 
-    // TODO: send exit message to leader
+    optional<Participant> manager = participants.compute([&](ParticipantTable &table) { return table.get_manager(); });
+    Message message(MessageType::QuitingRequest, manager.value().ip_address, get_self_mac_address(),
+                    get_self_hostname(), SEND_PORT);
+    messages.send(message);
 }
 
 int main(int argc, char *argv[])
@@ -360,6 +373,7 @@ int main(int argc, char *argv[])
 
     // Close channels
     messages.close();
+    cout << endl << "Exiting..." << endl;
 
     // detach everyone
     for (auto &thread : detach_threads)

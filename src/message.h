@@ -13,14 +13,15 @@ enum struct MessageType
 {
     Heartbeat,
     WakeupRequest,
-    LookingForLeader,
-    IAmTheLeader,
+    LookingForManager,
+    IAmTheManager,
     HeartbeatRequest,
+    QuitingRequest
 };
 
 /**
  * Message members will be enconded in csv format, for example:
- * message_type = 3 
+ * message_type = 3
  * ip = 1.2.3.4
  * mac_address = 55:55:55:55:55:55
  * sender_hostname = h-666.6.6

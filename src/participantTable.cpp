@@ -74,10 +74,10 @@ void ParticipantTable::print()
         max_hostname_length = max.hostname.length();
     }
 
-    string parsed_manager_mac_address = manager_mac_address ? manager_mac_address.value() : "No Leader MAC Address";
+    string parsed_manager_mac_address = manager_mac_address ? manager_mac_address.value() : "No Manager MAC Address";
 
     system("clear");
-    cout << "Leader MAC Address: " << parsed_manager_mac_address << endl << endl;
+    cout << "Manager MAC Address: " << parsed_manager_mac_address << endl << endl;
     cout << "Participants:" << endl;
     cout << "|";
 
@@ -132,6 +132,18 @@ void ParticipantTable::add_or_update_participant(Participant participant)
     }
 
     participants.push_back(participant);
+}
+
+void ParticipantTable::remove_participant_by_hostname(string hostname)
+{
+    for (auto it = participants.begin(); it != participants.end(); ++it)
+    {
+        if (it->hostname == hostname)
+        {
+            participants.erase(it);
+            return;
+        }
+    }
 }
 
 vector<Participant> ParticipantTable::get_participants()

@@ -20,7 +20,7 @@ struct Participant
 class ParticipantTable
 {
   private:
-    // The leader's MAC address. Empty if we haven't found it yet.
+    // The manager's MAC address. Empty if we haven't found it yet.
     optional<string> manager_mac_address;
     Participant self;
     vector<Participant> participants;
@@ -39,6 +39,7 @@ class ParticipantTable
     void print();
 
     void add_or_update_participant(Participant participant);
+    void remove_participant_by_hostname(string hostname);
 
     vector<Participant> get_participants();
 

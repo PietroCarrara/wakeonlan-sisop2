@@ -47,7 +47,7 @@ string get_self_hostname()
     return hostname;
 }
 
-void message_sender(Channel<Message> &messages, Socket &socket)
+void message_sender(Channel<Message> &messages, Socket &socket, Channel<None> &running)
 {
     while (auto msg_maybe = messages.receive())
     {
@@ -73,6 +73,14 @@ void message_sender(Channel<Message> &messages, Socket &socket)
             while (!socket.send(packet, SEND_PORT) && i < 10)
             {
                 i++;
+            }
+            if (i == 10)
+            {
+                cout << endl << "Unable to signal your exit to the manager, try again" << endl;
+            }
+            else
+            {
+                running.close();
             }
             break;
         default:
@@ -232,7 +240,18 @@ void command_subservice(Atomic<ParticipantTable> &participants, Channel<Message>
         }
         else if (command == "EXIT" || cin.eof())
         {
-            running.close();
+            if (participants.compute(([&](ParticipantTable &table) { return !table.is_self_manager(); })))
+            {
+                optional<Participant> manager =
+                    participants.compute([&](ParticipantTable &table) { return table.get_manager(); });
+                Message message(MessageType::QuitingRequest, manager.value().ip_address, get_self_mac_address(),
+                                get_self_hostname(), SEND_PORT);
+                messages.send(message);
+            }
+            else
+            {
+                running.close();
+            }
         }
         else
         {
@@ -268,11 +287,11 @@ void monitoring_subservice(Atomic<ParticipantTable> &participants, Channel<Messa
 {
     while (running.is_open())
     {
-        participants.with([&](ParticipantTable &participants) {
-            if (participants.is_self_manager())
-            {
+        if (participants.compute([&](ParticipantTable &table) { return table.is_self_manager(); }))
+        {
+            participants.with([&](ParticipantTable &table) {
                 auto now = chrono::system_clock::now();
-                for (auto &member : participants.get_participants())
+                for (auto &member : table.get_participants())
                 {
                     auto time_diff = now - member.last_time_seen_alive;
                     if (time_diff > 1s)
@@ -281,8 +300,8 @@ void monitoring_subservice(Atomic<ParticipantTable> &participants, Channel<Messa
                                               get_self_hostname(), SEND_PORT));
                     }
                 }
-            }
-        });
+            });
+        };
 
         this_thread::sleep_for(101ms);
     }
@@ -309,19 +328,23 @@ void graceful_shutdown(Atomic<ParticipantTable> &participants, Channel<Message> 
 
     while (running.is_open())
     {
-        if (!received_sigint)
-            continue;
-
-        running.close();
+        if (received_sigint)
+            break;
     }
 
-    if (participants.compute(([&](ParticipantTable &table) { return table.is_self_manager(); })))
-        return;
+    if (participants.compute(([&](ParticipantTable &table) { return !table.is_self_manager(); })))
+    {
+        optional<Participant> manager =
+            participants.compute([&](ParticipantTable &table) { return table.get_manager(); });
+        Message message(MessageType::QuitingRequest, manager.value().ip_address, get_self_mac_address(),
+                        get_self_hostname(), SEND_PORT);
 
-    optional<Participant> manager = participants.compute([&](ParticipantTable &table) { return table.get_manager(); });
-    Message message(MessageType::QuitingRequest, manager.value().ip_address, get_self_mac_address(),
-                    get_self_hostname(), SEND_PORT);
-    messages.send(message);
+        messages.send(message);
+    }
+    else
+    {
+        running.close();
+    }
 }
 
 int main(int argc, char *argv[])
@@ -350,7 +373,7 @@ int main(int argc, char *argv[])
 
     // Spawn threads
     threads.push_back(thread(message_receiver, ref(participants), ref(running), ref(socket), ref(messages)));
-    threads.push_back(thread(message_sender, ref(messages), ref(socket)));
+    threads.push_back(thread(message_sender, ref(messages), ref(socket), ref(running)));
     threads.push_back(thread(interface_subservice, ref(participants), ref(running)));
     threads.push_back(thread(monitoring_subservice, ref(participants), ref(messages), ref(running)));
     threads.push_back(thread(graceful_shutdown, ref(participants), ref(messages), ref(running)));

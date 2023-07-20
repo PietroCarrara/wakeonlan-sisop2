@@ -332,18 +332,21 @@ void graceful_shutdown(Atomic<ParticipantTable> &participants, Channel<Message> 
             break;
     }
 
-    if (participants.compute(([&](ParticipantTable &table) { return !table.is_self_manager(); })))
+    if (running.is_open())
     {
-        optional<Participant> manager =
-            participants.compute([&](ParticipantTable &table) { return table.get_manager(); });
-        Message message(MessageType::QuitingRequest, manager.value().ip_address, get_self_mac_address(),
-                        get_self_hostname(), SEND_PORT);
+        if (participants.compute(([&](ParticipantTable &table) { return !table.is_self_manager(); })))
+        {
+            optional<Participant> manager =
+                participants.compute([&](ParticipantTable &table) { return table.get_manager(); });
+            Message message(MessageType::QuitingRequest, manager.value().ip_address, get_self_mac_address(),
+                            get_self_hostname(), SEND_PORT);
 
-        messages.send(message);
-    }
-    else
-    {
-        running.close();
+            messages.send(message);
+        }
+        else
+        {
+            running.close();
+        }
     }
 }
 

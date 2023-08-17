@@ -1,3 +1,6 @@
+#ifndef CHANNEL_H
+#define CHANNEL_H
+
 #include <optional>
 #include <semaphore>
 
@@ -51,3 +54,5 @@ template <typename T> class Channel
         return open;
     }
 };
+
+#endif

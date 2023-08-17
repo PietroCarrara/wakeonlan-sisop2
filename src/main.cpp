@@ -11,13 +11,12 @@
 
 #include "atomic.h"
 #include "channel.h"
+#include "consts.h"
 #include "message.h"
 #include "participantTable.h"
 #include "socket.h"
+#include "state.h"
 #include "stringExtensions.h"
-
-constexpr Port SEND_PORT = 5000;
-constexpr Port RECEIVE_PORT = 5000;
 
 using namespace std;
 
@@ -47,9 +46,9 @@ string get_self_hostname()
     return hostname;
 }
 
-void message_sender(Channel<Message> &messages, Socket &socket, Channel<None> &running)
+void message_sender(Channel<Message> &outgoing_messages, Socket &socket, Channel<None> &running)
 {
-    while (auto msg_maybe = messages.receive())
+    while (auto msg_maybe = outgoing_messages.receive())
     {
         Message msg = msg_maybe.value();
         string data = msg.encode();
@@ -60,7 +59,7 @@ void message_sender(Channel<Message> &messages, Socket &socket, Channel<None> &r
         int i = 0;
         switch (msg.get_message_type())
         {
-        // Only important messages should be resent
+        // Only important outgoing_messages should be resent
         case MessageType::WakeupRequest:
             // Try 10 times
             while (!socket.send(packet, SEND_PORT) && i < 10)
@@ -104,8 +103,49 @@ void wake_on_lan(string hostname, Atomic<ParticipantTable> &table)
     system(wakeonlan_command.c_str());
 }
 
-void message_receiver(Atomic<ParticipantTable> &table, Channel<None> &running, Socket &socket,
-                      Channel<Message> &messages)
+void state_machine(ProgramState &state, Channel<Message> &incoming_messages, Channel<Message> &outgoing_messages,
+                   Channel<None> &running)
+{
+    while (running.is_open())
+    {
+        switch (state.get_state())
+        {
+        case StationState::SearchingManager:
+            state.search_for_manager(incoming_messages, outgoing_messages);
+            break;
+        case StationState::BeingManaged:
+            state.be_managed();
+            break;
+        case StationState::InElection:
+            state.run_election();
+            break;
+        case StationState::Managing:
+            state.manage();
+            break;
+        }
+    }
+}
+
+void message_receiver(Channel<Message> &incoming_messages, Socket &socket, Channel<None> &running)
+{
+    while (running.is_open())
+    {
+        optional<Datagram> datagram_option = socket.receive();
+        if (!datagram_option)
+        {
+            // sleep to avoid sokcet overuse
+            this_thread::sleep_for(101ms);
+            continue;
+        }
+
+        Datagram datagram = datagram_option.value();
+        Message message = Message::decode(datagram.data);
+        incoming_messages.send(message);
+    }
+}
+
+void message_receiver_legacy(Atomic<ParticipantTable> &table, Channel<None> &running, Socket &socket,
+                             Channel<Message> &outgoing_messages)
 {
     while (running.is_open())
     {
@@ -144,8 +184,8 @@ void message_receiver(Atomic<ParticipantTable> &table, Channel<None> &running, S
                         .last_time_seen_alive = chrono::system_clock::now(),
                     });
                 });
-                messages.send(Message(MessageType::IAmTheManager, datagram.ip, get_self_mac_address(),
-                                      get_self_hostname(), SEND_PORT));
+                outgoing_messages.send(Message(MessageType::IAmTheManager, datagram.ip, get_self_mac_address(),
+                                               get_self_hostname(), SEND_PORT));
             }
             break;
 
@@ -162,7 +202,7 @@ void message_receiver(Atomic<ParticipantTable> &table, Channel<None> &running, S
 
         case MessageType::HeartbeatRequest:
             // Someone requested a heartbeat, let's send it to them!
-            messages.send(
+            outgoing_messages.send(
                 Message(MessageType::Heartbeat, datagram.ip, get_self_mac_address(), get_self_hostname(), SEND_PORT));
             break;
 
@@ -183,7 +223,7 @@ void message_receiver(Atomic<ParticipantTable> &table, Channel<None> &running, S
     }
 }
 
-void find_manager(Atomic<ParticipantTable> &participants, Channel<Message> &messages, Channel<None> &running)
+void find_manager(Atomic<ParticipantTable> &participants, Channel<Message> &outgoing_messages, Channel<None> &running)
 {
     while (running.is_open() && participants.compute([&](ParticipantTable &participants) {
         return !participants.get_manager_mac_address().has_value();
@@ -191,20 +231,13 @@ void find_manager(Atomic<ParticipantTable> &participants, Channel<Message> &mess
     {
         Message message(MessageType::LookingForManager, "255.255.255.255", get_self_mac_address(), get_self_hostname(),
                         SEND_PORT);
-        messages.send(message);
+        outgoing_messages.send(message);
 
         this_thread::sleep_for(500ms);
     }
 }
 
-void setup_manager(Atomic<ParticipantTable> &participants)
-{
-    string mac = get_self_mac_address();
-
-    participants.with([&](ParticipantTable &participants) { participants.set_manager_mac_address(mac); });
-}
-
-void command_subservice(Atomic<ParticipantTable> &participants, Channel<Message> &messages, Channel<None> &running)
+void command_subservice(ProgramState &state, Channel<Message> &outgoing_messages, Channel<None> &running)
 {
     string input;
 
@@ -217,36 +250,13 @@ void command_subservice(Atomic<ParticipantTable> &participants, Channel<Message>
         if (command == "WAKEUP" && args.size() == 2)
         {
             string hostname = args[1];
-            optional<Participant> manager =
-                participants.compute([&](ParticipantTable &table) { return table.get_manager(); });
-
-            if (!manager)
-            {
-                cout << "Manager could not be found..." << endl;
-                continue;
-            }
-
-            // Special case if we're the manager: directly send the wakeonlan command
-            if (participants.compute(([&](ParticipantTable &table) { return table.is_self_manager(); })))
-            {
-                wake_on_lan(hostname, participants);
-            }
-            else
-            {
-                Message message(MessageType::WakeupRequest, manager.value().ip_address, get_self_mac_address(),
-                                hostname, SEND_PORT);
-                messages.send(message);
-            }
+            state.send_wakeup_command(hostname, outgoing_messages);
         }
         else if (command == "EXIT" || cin.eof())
         {
-            if (participants.compute(([&](ParticipantTable &table) { return !table.is_self_manager(); })))
+            if (state.get_state() != StationState::Managing)
             {
-                optional<Participant> manager =
-                    participants.compute([&](ParticipantTable &table) { return table.get_manager(); });
-                Message message(MessageType::QuitingRequest, manager.value().ip_address, get_self_mac_address(),
-                                get_self_hostname(), SEND_PORT);
-                messages.send(message);
+                state.send_exit_request(outgoing_messages);
             }
             else
             {
@@ -260,59 +270,31 @@ void command_subservice(Atomic<ParticipantTable> &participants, Channel<Message>
     }
 }
 
-void interface_subservice(Atomic<ParticipantTable> &participants, Channel<None> &running)
+void interface_subservice(ProgramState &state, Channel<None> &running)
 {
-    ParticipantTable previous_table;
+    ParticipantTable previous_table = state.clone_participants();
 
     while (running.is_open())
     {
-        bool table_changed = false;
-
-        participants.with([&](ParticipantTable &table) {
-            table_changed = !table.is_equal_to(previous_table);
-            if (table_changed)
-            {
-                previous_table = table.clone();
-            }
-        });
-
-        if (table_changed)
+        if (!state.is_participants_equal(previous_table))
         {
-            participants.with([&](ParticipantTable &table) { table.print(); });
+            previous_table = state.clone_participants();
+            state.print_participants();
         }
     }
 }
 
-void monitoring_subservice(Atomic<ParticipantTable> &participants, Channel<Message> &messages, Channel<None> &running)
+void monitoring_subservice(ProgramState &state, Channel<Message> &outgoing_messages, Channel<None> &running)
 {
     while (running.is_open())
     {
-        if (participants.compute([&](ParticipantTable &table) { return table.is_self_manager(); }))
+        if (state.get_state() == StationState::Managing)
         {
-            participants.with([&](ParticipantTable &table) {
-                auto now = chrono::system_clock::now();
-                for (auto &member : table.get_participants())
-                {
-                    auto time_diff = now - member.last_time_seen_alive;
-                    if (time_diff > 1s)
-                    {
-                        messages.send(Message(MessageType::HeartbeatRequest, member.ip_address, member.mac_address,
-                                              get_self_hostname(), SEND_PORT));
-                    }
-                }
-            });
+            state.ping_members(outgoing_messages);
         };
 
         this_thread::sleep_for(101ms);
     }
-}
-
-bool has_manager_role(int argc, char *argv[])
-{
-    if (argc > 1)
-        return (string)argv[1] == "manager";
-
-    return false;
 }
 
 bool received_sigint = false;
@@ -322,7 +304,7 @@ void signal_handler(int signal_number)
     received_sigint = true;
 }
 
-void graceful_shutdown(Atomic<ParticipantTable> &participants, Channel<Message> &messages, Channel<None> &running)
+void graceful_shutdown(ProgramState &state, Channel<Message> &outgoing_messages, Channel<None> &running)
 {
     signal(SIGINT, signal_handler);
 
@@ -334,14 +316,9 @@ void graceful_shutdown(Atomic<ParticipantTable> &participants, Channel<Message> 
 
     if (running.is_open())
     {
-        if (participants.compute(([&](ParticipantTable &table) { return !table.is_self_manager(); })))
+        if (state.get_state() != StationState::Managing)
         {
-            optional<Participant> manager =
-                participants.compute([&](ParticipantTable &table) { return table.get_manager(); });
-            Message message(MessageType::QuitingRequest, manager.value().ip_address, get_self_mac_address(),
-                            get_self_hostname(), SEND_PORT);
-
-            messages.send(message);
+            state.send_exit_request(outgoing_messages);
         }
         else
         {
@@ -353,11 +330,13 @@ void graceful_shutdown(Atomic<ParticipantTable> &participants, Channel<Message> 
 int main(int argc, char *argv[])
 {
     Atomic<ParticipantTable> participants;
+    ProgramState state;
     vector<thread> threads;
     vector<thread> detach_threads;
 
     Channel<None> running;
-    Channel<Message> messages;
+    Channel<Message> incoming_messages;
+    Channel<Message> outgoing_messages;
 
     // Add ourselves to the table
     participants.with([&](ParticipantTable &table) {
@@ -372,25 +351,18 @@ int main(int argc, char *argv[])
     Socket socket(RECEIVE_PORT, SEND_PORT);
     socket.open();
 
-    bool is_manager = has_manager_role(argc, argv);
-
     // Spawn threads
-    threads.push_back(thread(message_receiver, ref(participants), ref(running), ref(socket), ref(messages)));
-    threads.push_back(thread(message_sender, ref(messages), ref(socket), ref(running)));
-    threads.push_back(thread(interface_subservice, ref(participants), ref(running)));
-    threads.push_back(thread(monitoring_subservice, ref(participants), ref(messages), ref(running)));
-    threads.push_back(thread(graceful_shutdown, ref(participants), ref(messages), ref(running)));
+    threads.push_back(
+        thread(message_receiver_legacy, ref(participants), ref(running), ref(socket), ref(outgoing_messages)));
+    threads.push_back(thread(message_receiver, ref(incoming_messages), ref(socket), ref(running)));
+    threads.push_back(thread(message_sender, ref(outgoing_messages), ref(socket), ref(running)));
+    threads.push_back(thread(interface_subservice, ref(state), ref(running)));
+    threads.push_back(thread(monitoring_subservice, ref(state), ref(outgoing_messages), ref(running)));
+    threads.push_back(thread(graceful_shutdown, ref(state), ref(outgoing_messages), ref(running)));
 
-    detach_threads.push_back(thread(command_subservice, ref(participants), ref(messages), ref(running)));
+    detach_threads.push_back(thread(command_subservice, ref(state), ref(outgoing_messages), ref(running)));
 
-    if (is_manager)
-    {
-        setup_manager(participants);
-    }
-    else
-    {
-        find_manager(participants, messages, running);
-    }
+    find_manager(participants, outgoing_messages, running);
 
     while (running.is_open())
     {
@@ -398,7 +370,7 @@ int main(int argc, char *argv[])
     }
 
     // Close channels
-    messages.close();
+    outgoing_messages.close();
     cout << endl << "Exiting..." << endl;
 
     // detach everyone

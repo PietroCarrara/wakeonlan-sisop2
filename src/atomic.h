@@ -1,3 +1,6 @@
+#ifndef ATOMIC_H
+#define ATOMIC_H
+
 #include <functional>
 #include <mutex>
 
@@ -27,3 +30,5 @@ template <typename T> class Atomic
         lock.unlock();
     }
 };
+
+#endif

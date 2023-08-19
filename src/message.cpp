@@ -86,3 +86,8 @@ long Message::get_sender_id()
 {
     return _sender_id;
 }
+
+optional<string> Message::get_body()
+{
+    return _body;
+}

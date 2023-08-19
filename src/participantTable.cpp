@@ -288,3 +288,11 @@ vector<Participant> ParticipantTable::deserialize(string data)
 
     return participants;
 }
+
+void ParticipantTable::set_from_backup(vector<Participant> participants)
+{
+    for (auto participant : participants)
+    {
+        add_or_update_participant(participant);
+    }
+}

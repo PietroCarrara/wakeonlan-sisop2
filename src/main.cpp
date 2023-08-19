@@ -46,6 +46,23 @@ string get_self_hostname()
     return hostname;
 }
 
+string get_self_ip_address()
+{
+    string get_ip_address_command = "hostname -I | awk '{print $1}";
+    char buffer[16];
+
+    string result = "";
+
+    FILE *pipe = popen(get_ip_address_command.c_str(), "r");
+
+    while (fgets(buffer, sizeof(buffer), pipe) != NULL)
+        result += buffer;
+
+    pclose(pipe);
+
+    return result;
+}
+
 void message_sender(Channel<Message> &outgoing_messages, Socket &socket, Channel<None> &running)
 {
     while (auto msg_maybe = outgoing_messages.receive())
@@ -354,7 +371,7 @@ int main(int argc, char *argv[])
             .id = id,
             .hostname = get_self_hostname(),
             .mac_address = get_self_mac_address(),
-            .ip_address = "127.0.0.1",
+            .ip_address = get_self_ip_address(),
             .last_time_seen_alive = chrono::system_clock::now(),
         });
     });

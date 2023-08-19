@@ -132,9 +132,35 @@ void ProgramState::run_election()
     // If not, we've won!
 }
 
-void ProgramState::manage()
+void ProgramState::manage(Channel<Message> &incoming_messages, Channel<Message> &outgoing_messages)
 {
-    // Request pings from stations, send table, ...
+    // request pings
+    ping_members(outgoing_messages);
+
+    // wait for pings responses
+    auto waiting = chrono::system_clock::now();
+
+    while (chrono::system_clock::now() - waiting < 5s)
+    {
+        if (optional<Message> message = incoming_messages.receive())
+        {
+            switch (message.value().get_message_type())
+            {
+            case MessageType::Heartbeat: {
+                add_or_update_participant(Participant{
+                    .id = message.value().get_sender_id(),
+                    .hostname = message.value().get_sender_hostname(),
+                    .mac_address = message.value().get_mac_address(),
+                    .ip_address = message.value().get_ip(),
+                    .last_time_seen_alive = chrono::system_clock::now(),
+                });
+                break;
+            }
+            }
+        }
+    }
+
+    // send backup table
 }
 
 void ProgramState::wait_election()
@@ -162,6 +188,11 @@ void ProgramState::ping_members(Channel<Message> &messages)
             }
         }
     });
+}
+
+void ProgramState::add_or_update_participant(Participant participant)
+{
+    _participants.with([&](ParticipantTable &table) { table.add_or_update_participant(participant); });
 }
 
 ParticipantTable ProgramState::clone_participants()

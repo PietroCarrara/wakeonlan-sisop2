@@ -42,7 +42,7 @@ class ProgramState
     void search_for_manager(Channel<Message> &incoming_messages, Channel<Message> &outgoing_messages);
     void be_managed();
     void run_election();
-    void manage();
+    void manage(Channel<Message> &incoming_messages, Channel<Message> &outgoing_messages);
     void wait_election();
 
     // Table methods
@@ -51,6 +51,7 @@ class ProgramState
     ParticipantTable clone_participants();
     void print_participants();
     bool is_participants_equal(ParticipantTable table);
+    void add_or_update_participant(Participant participant);
 
     long get_self_id();
 

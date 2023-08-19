@@ -137,7 +137,7 @@ void state_machine(ProgramState &state, Channel<Message> &incoming_messages, Cha
             state.run_election();
             break;
         case StationState::Managing:
-            state.manage();
+            state.manage(incoming_messages, outgoing_messages);
             break;
         }
     }
@@ -213,6 +213,7 @@ void message_receiver_legacy(Atomic<ParticipantTable> &table, Channel<None> &run
         case MessageType::Heartbeat:
             table.with([&](ParticipantTable &table) {
                 table.add_or_update_participant(Participant{
+                    .id = message.get_sender_id(),
                     .hostname = message.get_sender_hostname(),
                     .mac_address = message.get_mac_address(),
                     .ip_address = datagram.ip,
@@ -387,6 +388,9 @@ int main(int argc, char *argv[])
     threads.push_back(thread(interface_subservice, ref(state), ref(running)));
     threads.push_back(thread(monitoring_subservice, ref(state), ref(outgoing_messages), ref(running)));
     threads.push_back(thread(graceful_shutdown, ref(state), ref(outgoing_messages), ref(running)));
+
+    // state machine
+    threads.push_back(thread(state_machine, ref(state), ref(incoming_messages), ref(outgoing_messages), ref(running)));
 
     detach_threads.push_back(thread(command_subservice, ref(state), ref(outgoing_messages), ref(running)));
 

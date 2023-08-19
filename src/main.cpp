@@ -24,6 +24,36 @@ struct None
 {
 };
 
+bool received_sigint = false;
+
+void signal_handler(int signal_number)
+{
+    received_sigint = true;
+}
+
+void graceful_shutdown(ProgramState &state, Channel<Message> &outgoing_messages, Channel<None> &running)
+{
+    signal(SIGINT, signal_handler);
+
+    while (running.is_open())
+    {
+        if (received_sigint)
+            break;
+    }
+
+    if (running.is_open())
+    {
+        if (state.get_state() != StationState::Managing)
+        {
+            state.send_exit_request(outgoing_messages);
+        }
+        else
+        {
+            running.close();
+        }
+    }
+}
+
 string get_self_mac_address()
 {
     string get_mac_command = "/sbin/ip link show eth0 | awk '/ether/{print $2}' | tr -d '\\n'";
@@ -69,7 +99,6 @@ void message_sender(Channel<Message> &outgoing_messages, Socket &socket, Channel
     {
         Message msg = msg_maybe.value();
         string data = msg.encode();
-        string wakeonlan_command = "wakeonlan " + msg.get_mac_address();
 
         Datagram packet = Datagram{.data = data, .ip = msg.get_ip()};
 
@@ -104,20 +133,6 @@ void message_sender(Channel<Message> &outgoing_messages, Socket &socket, Channel
             break;
         }
     }
-}
-
-void wake_on_lan(string hostname, Atomic<ParticipantTable> &table)
-{
-    optional<Participant> wakeonlan_target =
-        table.compute([&](ParticipantTable &table) { return table.find_by_hostname(hostname); });
-    if (!wakeonlan_target)
-    {
-        cout << "target " << hostname << " could not be found on participants table." << endl;
-        return;
-    }
-    // HACK: This is easier than crafting an wake-on-lan UDP packet >:)
-    string wakeonlan_command = "wakeonlan " + wakeonlan_target.value().mac_address;
-    system(wakeonlan_command.c_str());
 }
 
 void state_machine(ProgramState &state, Channel<Message> &incoming_messages, Channel<Message> &outgoing_messages,
@@ -232,12 +247,6 @@ void message_receiver_legacy(Atomic<ParticipantTable> &table, Channel<None> &run
             break;
         }
 
-        case MessageType::WakeupRequest:
-            // HACK: On the wakeuprequest message, the "hostname" field is not the sender's hostname,
-            // but the hostname of the machine we wish to wakeup
-            wake_on_lan(message.get_sender_hostname(), table);
-            break;
-
         case MessageType::QuitingRequest:
             table.with(
                 [&](ParticipantTable &table) { table.remove_participant_by_hostname(message.get_sender_hostname()); });
@@ -246,22 +255,6 @@ void message_receiver_legacy(Atomic<ParticipantTable> &table, Channel<None> &run
         default:
             break;
         }
-    }
-}
-
-void find_manager(Atomic<ParticipantTable> &participants, Channel<Message> &outgoing_messages, Channel<None> &running)
-{
-    while (running.is_open() && participants.compute([&](ParticipantTable &participants) {
-        return !participants.get_manager_mac_address().has_value();
-    }))
-    {
-        long self_id = participants.compute([&](ParticipantTable &table) { return table.get_self_id(); });
-
-        Message message(MessageType::LookingForManager, "255.255.255.255", get_self_mac_address(), get_self_hostname(),
-                        SEND_PORT, self_id);
-        outgoing_messages.send(message);
-
-        this_thread::sleep_for(500ms);
     }
 }
 
@@ -325,36 +318,6 @@ void monitoring_subservice(ProgramState &state, Channel<Message> &outgoing_messa
     }
 }
 
-bool received_sigint = false;
-
-void signal_handler(int signal_number)
-{
-    received_sigint = true;
-}
-
-void graceful_shutdown(ProgramState &state, Channel<Message> &outgoing_messages, Channel<None> &running)
-{
-    signal(SIGINT, signal_handler);
-
-    while (running.is_open())
-    {
-        if (received_sigint)
-            break;
-    }
-
-    if (running.is_open())
-    {
-        if (state.get_state() != StationState::Managing)
-        {
-            state.send_exit_request(outgoing_messages);
-        }
-        else
-        {
-            running.close();
-        }
-    }
-}
-
 int main(int argc, char *argv[])
 {
     Atomic<ParticipantTable> participants;
@@ -366,7 +329,8 @@ int main(int argc, char *argv[])
     Channel<Message> incoming_messages;
     Channel<Message> outgoing_messages;
 
-    // Add ourselves to the table
+    // TODO: don't do anything with the table
+    //       it will be shared by everyone through a new workflow
     participants.with([&](ParticipantTable &table) {
         long id = chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now().time_since_epoch()).count();
 
@@ -395,8 +359,6 @@ int main(int argc, char *argv[])
     threads.push_back(thread(state_machine, ref(state), ref(incoming_messages), ref(outgoing_messages), ref(running)));
 
     detach_threads.push_back(thread(command_subservice, ref(state), ref(outgoing_messages), ref(running)));
-
-    find_manager(participants, outgoing_messages, running);
 
     while (running.is_open())
     {

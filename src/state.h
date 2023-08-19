@@ -3,6 +3,7 @@
 
 #include "atomic.h"
 #include "channel.h"
+#include "consts.h"
 #include "message.h"
 #include "participantTable.h"
 #include <optional>

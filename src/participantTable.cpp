@@ -1,4 +1,5 @@
 #include "participantTable.h"
+#include "stringExtensions.h"
 
 using namespace std;
 

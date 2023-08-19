@@ -11,9 +11,10 @@ Message Message::decode(string data)
     string mac_address = data_tokens[2];
     string sender_hostname = data_tokens[3];
     int port = stoi(data_tokens[4]);
+    long sender_id = stol(data_tokens[5]);
 
-    Message decodedMessage(message_type, ip, mac_address,sender_hostname, port);
-    return decodedMessage; 
+    Message decodedMessage(message_type, ip, mac_address, sender_hostname, port, sender_id);
+    return decodedMessage;
 }
 
 string Message::encode()
@@ -22,23 +23,22 @@ string Message::encode()
 
     string str_message_type = to_string(static_cast<int>(_message_type));
     string str_port = to_string(_port);
+    string str_sender_id = to_string(_sender_id);
 
-    return 
-        str_message_type + ";" +
-        _ip + ";" +
-        _mac_address + ";" +
-        _sender_hostname + ";" +
-        str_port;
+    return str_message_type + ";" + _ip + ";" + _mac_address + ";" + _sender_hostname + ";" + str_port + ";" +
+           str_sender_id;
 }
 
 // Constructors:
-Message::Message(MessageType message_type, string ip, string mac_address, string sender_hostname, int port)
+Message::Message(MessageType message_type, string ip, string mac_address, string sender_hostname, int port,
+                 long sender_id)
 {
     _message_type = message_type;
     _ip = ip;
     _mac_address = mac_address;
     _sender_hostname = sender_hostname;
     _port = port;
+    _sender_id = sender_id;
 };
 
 // Accessors:
@@ -57,11 +57,17 @@ string Message::get_mac_address()
     return _mac_address;
 }
 
-string Message::get_sender_hostname(){
+string Message::get_sender_hostname()
+{
     return _sender_hostname;
 }
 
 int Message::get_port()
 {
     return _port;
+}
+
+long Message::get_sender_id()
+{
+    return _sender_id;
 }

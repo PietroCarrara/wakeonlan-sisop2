@@ -77,7 +77,8 @@ void ProgramState::search_for_manager(Channel<Message> &incoming_messages, Chann
 
     while (start - chrono::system_clock::now() < 10s)
     {
-        Message message(MessageType::LookingForManager, "255.255.255.255", _mac_address, _hostname, SEND_PORT);
+        Message message(MessageType::LookingForManager, "255.255.255.255", _mac_address, _hostname, SEND_PORT,
+                        get_self_id());
         outgoing_messages.send(message);
 
         auto attemtp_start = chrono::system_clock::now();
@@ -140,7 +141,7 @@ void ProgramState::ping_members(Channel<Message> &messages)
             if (time_diff > 1s)
             {
                 messages.send(Message(MessageType::HeartbeatRequest, member.ip_address, member.mac_address, _hostname,
-                                      SEND_PORT));
+                                      SEND_PORT, get_self_id()));
             }
         }
     });
@@ -175,7 +176,8 @@ void ProgramState::send_exit_request(Channel<Message> &messages)
     optional<Participant> manager = get_manager();
     if (manager)
     {
-        Message message(MessageType::QuitingRequest, manager.value().ip_address, _mac_address, _hostname, SEND_PORT);
+        Message message(MessageType::QuitingRequest, manager.value().ip_address, _mac_address, _hostname, SEND_PORT,
+                        get_self_id());
         messages.send(message);
     }
     else
@@ -204,7 +206,13 @@ void ProgramState::send_wakeup_command(string hostname, Channel<Message> &messag
     }
     else
     {
-        Message message(MessageType::WakeupRequest, manager.value().ip_address, _mac_address, hostname, SEND_PORT);
+        Message message(MessageType::WakeupRequest, manager.value().ip_address, _mac_address, hostname, SEND_PORT,
+                        get_self_id());
         messages.send(message);
     }
+}
+
+long ProgramState::get_self_id()
+{
+    return _participants.compute([&](ParticipantTable &table) { return table.get_self_id(); });
 }

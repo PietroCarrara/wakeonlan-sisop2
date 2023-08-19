@@ -20,7 +20,15 @@
     "socket": "cpp",
     "chrono": "cpp",
     "system_error": "cpp",
-    "iomanip": "cpp"
+    "iomanip": "cpp",
+    "array": "cpp",
+    "forward_list": "cpp",
+    "unordered_set": "cpp",
+    "initializer_list": "cpp",
+    "ranges": "cpp",
+    "span": "cpp",
+    "regex": "cpp",
+    "valarray": "cpp"
   },
   "editor.tabSize": 4
 }

@@ -149,7 +149,7 @@ void state_machine(ProgramState &state, Channel<Message> &incoming_messages, Cha
             state.be_managed(incoming_messages, outgoing_messages);
             break;
         case StationState::InElection:
-            state.run_election();
+            state.run_election(incoming_messages, outgoing_messages);
             break;
         case StationState::Managing:
             state.manage(incoming_messages, outgoing_messages);
@@ -305,19 +305,6 @@ void interface_subservice(ProgramState &state, Channel<None> &running)
     }
 }
 
-void monitoring_subservice(ProgramState &state, Channel<Message> &outgoing_messages, Channel<None> &running)
-{
-    while (running.is_open())
-    {
-        if (state.get_state() == StationState::Managing)
-        {
-            state.ping_members(outgoing_messages);
-        };
-
-        this_thread::sleep_for(101ms);
-    }
-}
-
 int main(int argc, char *argv[])
 {
     Atomic<ParticipantTable> participants;
@@ -352,7 +339,6 @@ int main(int argc, char *argv[])
     threads.push_back(thread(message_receiver, ref(incoming_messages), ref(socket), ref(running)));
     threads.push_back(thread(message_sender, ref(outgoing_messages), ref(socket), ref(running)));
     threads.push_back(thread(interface_subservice, ref(state), ref(running)));
-    threads.push_back(thread(monitoring_subservice, ref(state), ref(outgoing_messages), ref(running)));
     threads.push_back(thread(graceful_shutdown, ref(state), ref(outgoing_messages), ref(running)));
 
     // state machine

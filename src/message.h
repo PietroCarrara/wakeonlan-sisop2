@@ -18,6 +18,7 @@ enum struct MessageType
     IAmTheManager,
     HeartbeatRequest,
     QuitingRequest,
+    BackupTable,
     ElectionPing, // A station sends this to other stations that have bigger IDs
     ElectionPong  // A station answers this to stations that sent a ElectionPing
 };

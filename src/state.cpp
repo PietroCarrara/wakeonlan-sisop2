@@ -174,6 +174,14 @@ void ProgramState::manage(Channel<Message> &incoming_messages, Channel<Message> 
     }
 
     // send backup table
+    _participants.with([&](ParticipantTable &table) {
+        string table_serialized = table.serialize();
+        for (auto &member : table.get_participants())
+        {
+            outgoing_messages.send(Message(MessageType::BackupTable, member.ip_address, member.mac_address, _hostname,
+                                           SEND_PORT, get_self_id(), table_serialized));
+        }
+    });
 }
 
 void ProgramState::wait_election()

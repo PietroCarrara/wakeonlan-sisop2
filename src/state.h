@@ -40,7 +40,7 @@ class ProgramState
     // State methods
     StationState get_state();
     void search_for_manager(Channel<Message> &incoming_messages, Channel<Message> &outgoing_messages);
-    void be_managed();
+    void be_managed(Channel<Message> &incoming_messages, Channel<Message> &outgoing_messages);
     void run_election();
     void manage(Channel<Message> &incoming_messages, Channel<Message> &outgoing_messages);
     void wait_election();

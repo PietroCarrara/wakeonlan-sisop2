@@ -209,3 +209,82 @@ void ParticipantTable::set_self(string hostname, string mac_address, string ip_a
     };
     set_self(self);
 }
+
+string time_point_to_string(chrono::system_clock::time_point &time)
+{
+    auto tt = chrono::system_clock::to_time_t(time);
+
+    tm tm = *localtime(&tt);
+
+    stringstream ss;
+
+    ss << put_time(&tm, "%Y-%m-%d %H:%M:%S");
+
+    return ss.str();
+}
+
+chrono::system_clock::time_point time_point_from_string(string str_time)
+{
+    std::tm tm = {};
+    std::stringstream ss(str_time);
+    ss >> std::get_time(&tm, "%Y-%m-%d %H:%M:%S");
+    auto tp = std::chrono::system_clock::from_time_t(std::mktime(&tm));
+    return tp;
+}
+
+string ParticipantTable::serialize()
+{
+    string table = "";
+
+    for (long unsigned int i = 0; i < participants.size(); i++)
+    {
+        auto participant = participants[i];
+        string str_id = to_string(participant.id);
+        string str_last_time_seen_alive = time_point_to_string(participant.last_time_seen_alive);
+
+        table.append(str_id);
+        table.append(",");
+        table.append(str_last_time_seen_alive);
+        table.append(",");
+        table.append(participant.hostname);
+        table.append(",");
+        table.append(participant.ip_address);
+        table.append(",");
+        table.append(participant.mac_address);
+
+        if (i != participants.size() - 1)
+        {
+            table.append("#");
+        }
+    }
+
+    return table;
+}
+
+vector<Participant> ParticipantTable::deserialize(string data)
+{
+    vector<Participant> participants;
+
+    vector<string> data_tokens = StringExtensions::split(data, '#');
+
+    for (auto participant : data_tokens)
+    {
+        vector<string> participant_tokens = StringExtensions::split(data, ',');
+
+        long id = stol(participant_tokens[0]);
+        auto last_time_seen_alive = time_point_from_string(participant_tokens[1]);
+        string hostname = participant_tokens[2];
+        string ip_address = participant_tokens[3];
+        string mac_address = participant_tokens[4];
+
+        participants.push_back(Participant{
+            .id = id,
+            .hostname = hostname,
+            .mac_address = mac_address,
+            .ip_address = ip_address,
+            .last_time_seen_alive = last_time_seen_alive,
+        });
+    }
+
+    return participants;
+}

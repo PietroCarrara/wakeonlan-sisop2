@@ -54,6 +54,7 @@ class Message
     string get_sender_hostname();
     int get_port();
     long get_sender_id();
+    optional<string> get_body();
 
     static Message decode(string data);
 

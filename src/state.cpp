@@ -134,6 +134,20 @@ void ProgramState::be_managed(Channel<Message> &incoming_messages, Channel<Messa
                                            SEND_PORT, get_self_id()));
             break;
         }
+
+        case MessageType::BackupTable: {
+            optional<string> body = message.value().get_body();
+
+            if (body.has_value())
+            {
+                _participants.with([&](ParticipantTable &table) {
+                    vector<Participant> participants = table.deserialize(body.value());
+                    table.set_from_backup(participants);
+                });
+            }
+
+            break;
+        }
         }
     }
 }

@@ -54,6 +54,8 @@ class ParticipantTable
 
     string serialize();
     vector<Participant> deserialize(string data);
+
+    void set_from_backup(vector<Participant> participants);
 };
 
 #endif

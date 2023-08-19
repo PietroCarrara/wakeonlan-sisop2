@@ -140,6 +140,8 @@ void state_machine(ProgramState &state, Channel<Message> &incoming_messages, Cha
             state.manage(incoming_messages, outgoing_messages);
             break;
         }
+
+        this_thread::sleep_for(101ms);
     }
 }
 

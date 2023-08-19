@@ -165,6 +165,7 @@ void message_receiver_legacy(Atomic<ParticipantTable> &table, Channel<None> &run
             table.with([&](ParticipantTable &table) {
                 table.set_manager_mac_address(message.get_mac_address());
                 table.add_or_update_participant(Participant{
+                    .id = message.get_sender_id(),
                     .hostname = message.get_sender_hostname(),
                     .mac_address = message.get_mac_address(),
                     .ip_address = datagram.ip,
@@ -178,14 +179,17 @@ void message_receiver_legacy(Atomic<ParticipantTable> &table, Channel<None> &run
             {
                 table.with([&](ParticipantTable &table) {
                     table.add_or_update_participant(Participant{
+                        .id = message.get_sender_id(),
                         .hostname = message.get_sender_hostname(),
                         .mac_address = message.get_mac_address(),
                         .ip_address = datagram.ip,
                         .last_time_seen_alive = chrono::system_clock::now(),
                     });
                 });
+
+                long self_id = table.compute([&](ParticipantTable &table) { return table.get_self_id(); });
                 outgoing_messages.send(Message(MessageType::IAmTheManager, datagram.ip, get_self_mac_address(),
-                                               get_self_hostname(), SEND_PORT));
+                                               get_self_hostname(), SEND_PORT, self_id));
             }
             break;
 
@@ -200,11 +204,13 @@ void message_receiver_legacy(Atomic<ParticipantTable> &table, Channel<None> &run
             });
             break;
 
-        case MessageType::HeartbeatRequest:
+        case MessageType::HeartbeatRequest: {
+            long self_id = table.compute([&](ParticipantTable &table) { return table.get_self_id(); });
             // Someone requested a heartbeat, let's send it to them!
-            outgoing_messages.send(
-                Message(MessageType::Heartbeat, datagram.ip, get_self_mac_address(), get_self_hostname(), SEND_PORT));
+            outgoing_messages.send(Message(MessageType::Heartbeat, datagram.ip, get_self_mac_address(),
+                                           get_self_hostname(), SEND_PORT, self_id));
             break;
+        }
 
         case MessageType::WakeupRequest:
             // HACK: On the wakeuprequest message, the "hostname" field is not the sender's hostname,
@@ -229,8 +235,10 @@ void find_manager(Atomic<ParticipantTable> &participants, Channel<Message> &outg
         return !participants.get_manager_mac_address().has_value();
     }))
     {
+        long self_id = participants.compute([&](ParticipantTable &table) { return table.get_self_id(); });
+
         Message message(MessageType::LookingForManager, "255.255.255.255", get_self_mac_address(), get_self_hostname(),
-                        SEND_PORT);
+                        SEND_PORT, self_id);
         outgoing_messages.send(message);
 
         this_thread::sleep_for(500ms);

@@ -51,6 +51,8 @@ class ProgramState
     void print_participants();
     bool is_participants_equal(ParticipantTable table);
 
+    long get_self_id();
+
     // Communication methods
     void send_exit_request(Channel<Message> &messages);
     void send_wakeup_command(string hostname, Channel<Message> &messages);

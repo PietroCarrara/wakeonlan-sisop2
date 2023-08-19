@@ -38,15 +38,17 @@ class Message
     string _mac_address;
     string _sender_hostname;
     int _port;
+    long _sender_id;
 
   public:
-    Message(MessageType message_type, string ip, string mac_address, string sender_hostname, int port);
+    Message(MessageType message_type, string ip, string mac_address, string sender_hostname, int port, long sender_id);
 
     MessageType get_message_type();
     string get_ip();
     string get_mac_address();
     string get_sender_hostname();
     int get_port();
+    long get_sender_id();
 
     static Message decode(string data);
 

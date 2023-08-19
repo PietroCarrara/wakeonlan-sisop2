@@ -7,6 +7,8 @@
 #include <optional>
 #include <vector>
 
+#include <stringExtensions.h>
+
 using namespace std;
 
 struct Participant
@@ -49,6 +51,9 @@ class ParticipantTable
 
     optional<Participant> get_manager();
     optional<Participant> find_by_hostname(string hostname);
+
+    string serialize();
+    vector<Participant> deserialize(string data);
 };
 
 #endif

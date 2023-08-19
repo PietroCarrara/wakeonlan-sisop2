@@ -12,13 +12,9 @@ $(PROJECT):
 
 # --------------
 # RECIPES ONLY:
-.PHONY: client
+.PHONY: start_station
 client: 
 	./$(OUT_DIR)/$(PROJECT)
-
-.PHONY: manager
-manager:
-	./$(OUT_DIR)/$(PROJECT) manager
 
 .PHONY: clear_build
 clear_build:

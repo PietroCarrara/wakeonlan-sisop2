@@ -7,8 +7,6 @@
 #include <optional>
 #include <vector>
 
-#include <stringExtensions.h>
-
 using namespace std;
 
 struct Participant

@@ -11,6 +11,7 @@ using namespace std;
 
 struct Participant
 {
+    long id;
     string hostname;
     string mac_address;
     string ip_address;
@@ -40,6 +41,8 @@ class ParticipantTable
 
     void add_or_update_participant(Participant participant);
     void remove_participant_by_hostname(string hostname);
+
+    long get_self_id();
 
     vector<Participant> get_participants();
 

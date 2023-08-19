@@ -7,6 +7,7 @@
 #include "message.h"
 #include "participantTable.h"
 #include <optional>
+#include <vector>
 
 enum struct StationState
 {
@@ -26,14 +27,13 @@ class ProgramState
     string _mac_address;
 
     // State transitions
-    void search_manager_timeout();
-    void election_timeout();
-    void challenge_role();
-    void found_manager();
-    void lost_election();
-    void win_timeout();
-    void start_election();
-    void manager_dead();
+    void _challenge_role();
+    void _found_manager();
+    void _lost_election();
+    void _win_timeout();
+    void _start_election();
+    void _manager_dead();
+    void _start_management();
 
   public:
     ProgramState();
@@ -42,7 +42,7 @@ class ProgramState
     StationState get_state();
     void search_for_manager(Channel<Message> &incoming_messages, Channel<Message> &outgoing_messages);
     void be_managed(Channel<Message> &incoming_messages, Channel<Message> &outgoing_messages);
-    void run_election();
+    void run_election(Channel<Message> &incoming_messages, Channel<Message> &outgoing_messages);
     void manage(Channel<Message> &incoming_messages, Channel<Message> &outgoing_messages);
     void wait_election();
 

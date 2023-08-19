@@ -1,6 +1,7 @@
 #ifndef MESSAGE_H
 #define MESSAGE_H
 
+#include <optional>
 #include <string.h>
 
 #include "stringExtensions.h"
@@ -39,9 +40,12 @@ class Message
     string _sender_hostname;
     int _port;
     long _sender_id;
+    optional<string> _body;
 
   public:
     Message(MessageType message_type, string ip, string mac_address, string sender_hostname, int port, long sender_id);
+    Message(MessageType message_type, string ip, string mac_address, string sender_hostname, int port, long sender_id,
+            optional<string> body);
 
     MessageType get_message_type();
     string get_ip();

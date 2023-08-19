@@ -191,3 +191,8 @@ optional<Participant> ParticipantTable::find_by_hostname(string hostname)
 
     return {};
 }
+
+long ParticipantTable::get_self_id()
+{
+    return self.id;
+}

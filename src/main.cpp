@@ -340,7 +340,10 @@ int main(int argc, char *argv[])
 
     // Add ourselves to the table
     participants.with([&](ParticipantTable &table) {
+        long id = chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now().time_since_epoch()).count();
+
         table.set_self(Participant{
+            .id = id,
             .hostname = get_self_hostname(),
             .mac_address = get_self_mac_address(),
             .ip_address = "127.0.0.1",

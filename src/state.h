@@ -20,6 +20,7 @@ class ProgramState
   private:
     Atomic<StationState> _stationState;
     Atomic<ParticipantTable> _participants;
+    // TODO: long _id;
     string _hostname;
     string _mac_address;
 

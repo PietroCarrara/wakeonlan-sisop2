@@ -24,6 +24,23 @@ string _get_self_mac_address()
     return result;
 }
 
+string _get_self_ip_address()
+{
+    string get_ip_address_command = "hostname -I | awk '{print $1}";
+    char buffer[16];
+
+    string result = "";
+
+    FILE *pipe = popen(get_ip_address_command.c_str(), "r");
+
+    while (fgets(buffer, sizeof(buffer), pipe) != NULL)
+        result += buffer;
+
+    pclose(pipe);
+
+    return result;
+}
+
 void _wake_on_lan(Participant wakeonlan_target)
 {
     // HACK: This is easier than crafting an wake-on-lan UDP packet >:)
@@ -168,6 +185,8 @@ ProgramState::ProgramState()
     _stationState.with([&](StationState &state) { state = StationState::SearchingManager; });
     _hostname = _get_self_hostname();
     _mac_address = _get_self_mac_address();
+    _participants.with(
+        [&](ParticipantTable &table) { table.set_self(_hostname, _mac_address, _get_self_ip_address()); });
 }
 
 // Communication methods

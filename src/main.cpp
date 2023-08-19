@@ -131,7 +131,7 @@ void state_machine(ProgramState &state, Channel<Message> &incoming_messages, Cha
             state.search_for_manager(incoming_messages, outgoing_messages);
             break;
         case StationState::BeingManaged:
-            state.be_managed();
+            state.be_managed(incoming_messages, outgoing_messages);
             break;
         case StationState::InElection:
             state.run_election();

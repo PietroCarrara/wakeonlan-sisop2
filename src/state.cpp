@@ -120,9 +120,22 @@ void ProgramState::search_for_manager(Channel<Message> &incoming_messages, Chann
     search_manager_timeout();
 }
 
-void ProgramState::be_managed()
+void ProgramState::be_managed(Channel<Message> &incoming_messages, Channel<Message> &outgoing_messages)
 {
-    // TODO: Answer pings, answer election messages, ...
+    // TODO: answer election messages, ...
+
+    if (optional<Message> message = incoming_messages.receive())
+    {
+        switch (message.value().get_message_type())
+        {
+            // answer pings
+        case MessageType::HeartbeatRequest: {
+            outgoing_messages.send(Message(MessageType::Heartbeat, message.value().get_ip(), _mac_address, _hostname,
+                                           SEND_PORT, get_self_id()));
+            break;
+        }
+        }
+    }
 }
 
 void ProgramState::run_election()

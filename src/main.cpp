@@ -56,8 +56,15 @@ void graceful_shutdown(ProgramState &state, Channel<Message> &outgoing_messages,
 
 void message_sender(Channel<Message> &outgoing_messages, Socket &socket, Channel<None> &running)
 {
-    while (auto msg_maybe = outgoing_messages.receive())
+    while (outgoing_messages.is_open())
     {
+        auto msg_maybe = outgoing_messages.receive();
+
+        if (!msg_maybe.has_value())
+        {
+            continue;
+        }
+
         Message msg = msg_maybe.value();
         string data = msg.encode();
 

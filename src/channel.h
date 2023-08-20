@@ -3,50 +3,54 @@
 
 #include <optional>
 #include <semaphore>
+#include <vector>
 
 using namespace std;
 
 template <typename T> class Channel
 {
   private:
-    binary_semaphore senders = binary_semaphore{1};
-    binary_semaphore receivers = binary_semaphore{0};
+    binary_semaphore lock = binary_semaphore{1};
     bool open = true;
-    optional<T> data;
+    vector<T> data;
 
   public:
     void send(T to_send)
     {
-        senders.acquire();
+        lock.acquire();
         if (!open)
         {
             throw exception();
         }
-
-        data = to_send;
-        receivers.release();
+        data.push_back(to_send);
+        lock.release();
     }
 
     optional<T> receive()
     {
-        receivers.acquire();
+        lock.acquire();
+
         if (!open)
         {
             return {};
         }
+        optional<T> result = {};
+        if (data.size() > 0)
+        {
+            result = data.front();
+            data.erase(data.begin());
+        }
+        lock.release();
 
-        T result = data.value();
-        data = {};
-        senders.release();
         return result;
     }
 
     void close()
     {
-        senders.acquire();
+        lock.acquire();
         open = false;
-        data = {};
-        receivers.release();
+        data.clear();
+        lock.release();
     }
 
     bool is_open()

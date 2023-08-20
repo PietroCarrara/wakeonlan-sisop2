@@ -106,7 +106,9 @@ void ProgramState::search_for_manager(Channel<Message> &incoming_messages, Chann
         auto attemtp_start = chrono::system_clock::now();
         while (attemtp_start - chrono::system_clock::now() < 1s)
         {
-            if (optional<Message> message = incoming_messages.receive())
+            optional<Message> message = incoming_messages.receive();
+
+            if (message.has_value())
             {
 
                 switch (message.value().get_message_type())
@@ -132,8 +134,9 @@ void ProgramState::search_for_manager(Channel<Message> &incoming_messages, Chann
 void ProgramState::be_managed(Channel<Message> &incoming_messages, Channel<Message> &outgoing_messages)
 {
     // TODO: answer election messages, ...
+    optional<Message> message = incoming_messages.receive();
 
-    if (optional<Message> message = incoming_messages.receive())
+    if (message.has_value())
     {
         switch (message.value().get_message_type())
         {
@@ -194,7 +197,9 @@ void ProgramState::run_election(Channel<Message> &incoming_messages, Channel<Mes
         auto attemtp_start = chrono::system_clock::now();
         while (attemtp_start - chrono::system_clock::now() < 1s)
         {
-            if (optional<Message> message = incoming_messages.receive())
+            optional<Message> message = incoming_messages.receive();
+
+            if (message.has_value())
             {
 
                 switch (message.value().get_message_type())
@@ -235,7 +240,9 @@ void ProgramState::manage(Channel<Message> &incoming_messages, Channel<Message> 
 
     while (chrono::system_clock::now() - waiting < 5s)
     {
-        if (optional<Message> message = incoming_messages.receive())
+        optional<Message> message = incoming_messages.receive();
+
+        if (message.has_value())
         {
             switch (message.value().get_message_type())
             {

@@ -11,6 +11,7 @@ void ParticipantTable::set_manager_mac_address(string mac_address)
 void ParticipantTable::set_self(Participant self)
 {
     this->self = self;
+    add_or_update_participant(self);
 }
 
 optional<string> ParticipantTable::get_manager_mac_address()

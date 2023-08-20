@@ -78,7 +78,7 @@ string get_self_hostname()
 
 string get_self_ip_address()
 {
-    string get_ip_address_command = "hostname -I | awk '{print $1}";
+    string get_ip_address_command = "hostname -I | awk '{print $1}'";
     char buffer[16];
 
     string result = "";

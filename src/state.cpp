@@ -233,7 +233,7 @@ void ProgramState::manage(Channel<Message> &incoming_messages, Channel<Message> 
     // request pings
     ping_members(outgoing_messages);
 
-    // wait for pings responses
+    // wait for client messages
     auto waiting = chrono::system_clock::now();
 
     while (chrono::system_clock::now() - waiting < 5s)
@@ -251,6 +251,22 @@ void ProgramState::manage(Channel<Message> &incoming_messages, Channel<Message> 
                     .last_time_seen_alive = chrono::system_clock::now(),
                 });
                 break;
+            case MessageType::LookingForManager: {
+                add_or_update_participant(Participant{
+                    .id = message.value().get_sender_id(),
+                    .hostname = message.value().get_sender_hostname(),
+                    .mac_address = message.value().get_mac_address(),
+                    .ip_address = message.value().get_ip(),
+                    .last_time_seen_alive = chrono::system_clock::now(),
+                });
+                outgoing_messages.send(Message(MessageType::IAmTheManager, message.value().get_ip(), _mac_address,
+                                               _hostname, SEND_PORT, get_self_id()));
+                break;
+            }
+            case MessageType::QuitingRequest: {
+                remove_participant_by_hostname(message.value().get_sender_hostname());
+                break;
+            }
             default:
                 break;
             }
@@ -321,6 +337,16 @@ bool ProgramState::is_participants_equal(ParticipantTable to_compare)
     return _participants.compute([&](ParticipantTable &table) { return table.is_equal_to(to_compare); });
 }
 
+long ProgramState::get_self_id()
+{
+    return _participants.compute([&](ParticipantTable &table) { return table.get_self_id(); });
+}
+
+void ProgramState::remove_participant_by_hostname(string hostname)
+{
+    _participants.with([&](ParticipantTable &table) { table.remove_participant_by_hostname(hostname); });
+}
+
 // Constructor
 ProgramState::ProgramState()
 {
@@ -371,9 +397,4 @@ void ProgramState::send_wakeup_command(string hostname, Channel<Message> &outgoi
                         get_self_id());
         outgoing_messages.send(message);
     }
-}
-
-long ProgramState::get_self_id()
-{
-    return _participants.compute([&](ParticipantTable &table) { return table.get_self_id(); });
 }

@@ -53,6 +53,7 @@ class ProgramState
     void print_participants();
     bool is_participants_equal(ParticipantTable table);
     void add_or_update_participant(Participant participant);
+    void remove_participant_by_hostname(string hostname);
 
     long get_self_id();
 

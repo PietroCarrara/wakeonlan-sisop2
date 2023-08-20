@@ -142,13 +142,9 @@ void ProgramState::be_managed(Channel<Message> &incoming_messages, Channel<Messa
             outgoing_messages.send(Message(MessageType::Heartbeat, message.value().get_ip(), _mac_address, _hostname,
                                            SEND_PORT, get_self_id()));
             break;
-        default:
-            break;
         }
-
         case MessageType::BackupTable: {
             optional<string> body = message.value().get_body();
-
             if (body.has_value())
             {
                 _participants.with([&](ParticipantTable &table) {
@@ -156,9 +152,10 @@ void ProgramState::be_managed(Channel<Message> &incoming_messages, Channel<Messa
                     table.set_from_backup(participants);
                 });
             }
-
             break;
         }
+        default:
+            break;
         }
     }
 }

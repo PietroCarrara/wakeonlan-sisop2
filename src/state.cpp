@@ -97,14 +97,14 @@ void ProgramState::search_for_manager(Channel<Message> &incoming_messages, Chann
 {
     auto start = chrono::system_clock::now();
 
-    while (start - chrono::system_clock::now() < 10s)
+    while (chrono::system_clock::now() - start < 10s)
     {
         Message search_message(MessageType::LookingForManager, "255.255.255.255", _mac_address, _hostname, SEND_PORT,
                                get_self_id());
         outgoing_messages.send(search_message);
 
         auto attemtp_start = chrono::system_clock::now();
-        while (attemtp_start - chrono::system_clock::now() < 1s)
+        while (chrono::system_clock::now() - attemtp_start < 1s)
         {
             optional<Message> message = incoming_messages.receive();
 
@@ -191,11 +191,11 @@ void ProgramState::run_election(Channel<Message> &incoming_messages, Channel<Mes
     });
 
     auto start = chrono::system_clock::now();
-    while (start - chrono::system_clock::now() < 5s)
+    while (chrono::system_clock::now() - start < 5s)
     {
         // Wait pong from others
         auto attemtp_start = chrono::system_clock::now();
-        while (attemtp_start - chrono::system_clock::now() < 1s)
+        while (chrono::system_clock::now() - attemtp_start < 1s)
         {
             optional<Message> message = incoming_messages.receive();
 

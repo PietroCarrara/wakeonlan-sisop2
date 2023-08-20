@@ -286,6 +286,11 @@ void ProgramState::ping_members(Channel<Message> &outgoing_messages)
         auto now = chrono::system_clock::now();
         for (auto &member : table.get_participants())
         {
+            if (member.id == get_self_id())
+            {
+                continue;
+            }
+
             auto time_diff = now - member.last_time_seen_alive;
             if (time_diff > 1s)
             {

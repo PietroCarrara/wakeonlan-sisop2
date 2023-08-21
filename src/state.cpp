@@ -1,45 +1,5 @@
 #include "state.h"
 
-// Utils
-string _get_self_hostname()
-{
-    char hostname[HOST_NAME_MAX + 1];
-    gethostname(hostname, HOST_NAME_MAX + 1);
-    return hostname;
-}
-
-string _get_self_mac_address()
-{
-    string get_mac_command = "/sbin/ip link show eth0 | awk '/ether/{print $2}' | tr -d '\\n'";
-    char buffer[17];
-
-    string result = "";
-
-    FILE *pipe = popen(get_mac_command.c_str(), "r");
-    while (fgets(buffer, sizeof(buffer), pipe) != NULL)
-        result += buffer;
-    pclose(pipe);
-
-    return result;
-}
-
-string _get_self_ip_address()
-{
-    string get_ip_address_command = "hostname -I | awk '{print $1}'";
-    char buffer[16];
-
-    string result = "";
-
-    FILE *pipe = popen(get_ip_address_command.c_str(), "r");
-
-    while (fgets(buffer, sizeof(buffer), pipe) != NULL)
-        result += buffer;
-
-    pclose(pipe);
-
-    return result;
-}
-
 void _wake_on_lan(Participant wakeonlan_target)
 {
     // HACK: This is easier than crafting an wake-on-lan UDP packet >:)
@@ -97,10 +57,10 @@ void ProgramState::search_for_manager(Channel<Message> &incoming_messages, Chann
 {
     auto start = chrono::system_clock::now();
 
-    while (start - chrono::system_clock::now() < 10s)
+    while (start - chrono::system_clock::now() < 3s)
     {
         Message search_message(MessageType::LookingForManager, "255.255.255.255", _mac_address, _hostname, SEND_PORT,
-                               get_self_id());
+                               _id);
         outgoing_messages.send(search_message);
 
         auto attemtp_start = chrono::system_clock::now();
@@ -115,8 +75,7 @@ void ProgramState::search_for_manager(Channel<Message> &incoming_messages, Chann
                     _found_manager();
                     return;
                 case MessageType::ElectionPing:
-                    _send_election_pong(outgoing_messages, message.value().get_ip(), _mac_address, _hostname,
-                                        get_self_id());
+                    _send_election_pong(outgoing_messages, message.value().get_ip(), _mac_address, _hostname, _id);
                     _start_election();
                     return;
                 default:
@@ -139,8 +98,8 @@ void ProgramState::be_managed(Channel<Message> &incoming_messages, Channel<Messa
         {
             // answer pings
         case MessageType::HeartbeatRequest: {
-            outgoing_messages.send(Message(MessageType::Heartbeat, message.value().get_ip(), _mac_address, _hostname,
-                                           SEND_PORT, get_self_id()));
+            outgoing_messages.send(
+                Message(MessageType::Heartbeat, message.value().get_ip(), _mac_address, _hostname, SEND_PORT, _id));
             break;
         }
         case MessageType::BackupTable: {
@@ -167,23 +126,24 @@ void ProgramState::run_election(Channel<Message> &incoming_messages, Channel<Mes
         vector<Participant> older_stations;
 
         std::copy_if(participants.begin(), participants.end(), std::back_inserter(older_stations),
-                     [&](Participant participant) { return participant.id < get_self_id(); });
+                     [&](Participant participant) { return participant.id < _id; });
         return older_stations;
     });
 
     if (older_stations.size() == 0)
     {
         // We're the oldest station, we won!
-        outgoing_messages.send(Message(MessageType::IAmTheManager, "255.255.255.255", _get_self_mac_address(),
-                                       _get_self_hostname(), SEND_PORT, get_self_id()));
+        outgoing_messages.send(
+            Message(MessageType::IAmTheManager, "255.255.255.255", _mac_address, _hostname, SEND_PORT, _id));
         _start_management();
+        return;
     }
 
     _participants.with([&](ParticipantTable &table) {
         for (auto &member : older_stations)
         {
-            outgoing_messages.send(Message(MessageType::ElectionPing, member.ip_address, member.mac_address, _hostname,
-                                           SEND_PORT, get_self_id()));
+            outgoing_messages.send(
+                Message(MessageType::ElectionPing, member.ip_address, member.mac_address, _hostname, SEND_PORT, _id));
         }
     });
 
@@ -205,8 +165,7 @@ void ProgramState::run_election(Channel<Message> &incoming_messages, Channel<Mes
                     return;
                 // If someone is lost and want a new election, just shut them up
                 case MessageType::ElectionPing:
-                    _send_election_pong(outgoing_messages, message.value().get_ip(), _mac_address, _hostname,
-                                        get_self_id());
+                    _send_election_pong(outgoing_messages, message.value().get_ip(), _mac_address, _hostname, _id);
                     return;
                 // Higher council will decide the winner for us, wait for the results by searching for the manager
                 case MessageType::ElectionPong:
@@ -220,8 +179,8 @@ void ProgramState::run_election(Channel<Message> &incoming_messages, Channel<Mes
     }
 
     // No one responded, so we won!
-    outgoing_messages.send(Message(MessageType::IAmTheManager, "255.255.255.255", _get_self_mac_address(),
-                                   _get_self_hostname(), SEND_PORT, get_self_id()));
+    outgoing_messages.send(
+        Message(MessageType::IAmTheManager, "255.255.255.255", _mac_address, _hostname, SEND_PORT, _id));
     _start_management();
 }
 
@@ -257,7 +216,7 @@ void ProgramState::manage(Channel<Message> &incoming_messages, Channel<Message> 
                     .last_time_seen_alive = chrono::system_clock::now(),
                 });
                 outgoing_messages.send(Message(MessageType::IAmTheManager, message.value().get_ip(), _mac_address,
-                                               _hostname, SEND_PORT, get_self_id()));
+                                               _hostname, SEND_PORT, _id));
                 break;
             }
             case MessageType::QuitingRequest: {
@@ -277,7 +236,7 @@ void ProgramState::manage(Channel<Message> &incoming_messages, Channel<Message> 
         for (auto &member : table.get_participants())
         {
             outgoing_messages.send(Message(MessageType::BackupTable, member.ip_address, member.mac_address, _hostname,
-                                           SEND_PORT, get_self_id(), table_serialized));
+                                           SEND_PORT, _id, table_serialized));
         }
     });
 }
@@ -299,7 +258,7 @@ void ProgramState::ping_members(Channel<Message> &outgoing_messages)
         auto now = chrono::system_clock::now();
         for (auto &member : table.get_participants())
         {
-            if (member.id == get_self_id())
+            if (member.id == _id)
             {
                 continue;
             }
@@ -308,7 +267,7 @@ void ProgramState::ping_members(Channel<Message> &outgoing_messages)
             if (time_diff > 1s)
             {
                 outgoing_messages.send(Message(MessageType::HeartbeatRequest, member.ip_address, member.mac_address,
-                                               _hostname, SEND_PORT, get_self_id()));
+                                               _hostname, SEND_PORT, _id));
             }
         }
     });
@@ -334,11 +293,6 @@ bool ProgramState::is_participants_equal(ParticipantTable to_compare)
     return _participants.compute([&](ParticipantTable &table) { return table.is_equal_to(to_compare); });
 }
 
-long ProgramState::get_self_id()
-{
-    return _participants.compute([&](ParticipantTable &table) { return table.get_self_id(); });
-}
-
 void ProgramState::remove_participant_by_hostname(string hostname)
 {
     _participants.with([&](ParticipantTable &table) { table.remove_participant_by_hostname(hostname); });
@@ -348,10 +302,42 @@ void ProgramState::remove_participant_by_hostname(string hostname)
 ProgramState::ProgramState()
 {
     _stationState.with([&](StationState &state) { state = StationState::SearchingManager; });
-    _hostname = _get_self_hostname();
-    _mac_address = _get_self_mac_address();
-    _participants.with(
-        [&](ParticipantTable &table) { table.set_self(_hostname, _mac_address, _get_self_ip_address()); });
+
+    // Generate self id
+    _id = chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now().time_since_epoch()).count();
+
+    // Get self ip address
+    {
+        string get_ip_address_command = "hostname -i | awk '{print $1}'";
+        char buffer[16];
+        string result = "";
+        FILE *pipe = popen(get_ip_address_command.c_str(), "r");
+        while (fgets(buffer, sizeof(buffer), pipe) != NULL)
+            result += buffer;
+        pclose(pipe);
+        _ip_address = result;
+    }
+
+    // Get self hostname
+    {
+        char hostname[HOST_NAME_MAX + 1];
+        gethostname(hostname, HOST_NAME_MAX + 1);
+        _hostname = hostname;
+    }
+
+    // Get self mac address
+    {
+        string get_mac_command = "ip link show wlp3s0 | awk '/ether/{print $2}' | tr -d '\\n'";
+        char buffer[17];
+        string result = "";
+        FILE *pipe = popen(get_mac_command.c_str(), "r");
+        while (fgets(buffer, sizeof(buffer), pipe) != NULL)
+            result += buffer;
+        pclose(pipe);
+        _mac_address = result;
+    }
+
+    _participants.with([&](ParticipantTable &table) { table.set_self(_hostname, _mac_address, _ip_address, _id); });
 }
 
 // Communication methods
@@ -361,7 +347,7 @@ void ProgramState::send_exit_request(Channel<Message> &messages)
     if (manager)
     {
         Message message(MessageType::QuitingRequest, manager.value().ip_address, _mac_address, _hostname, SEND_PORT,
-                        get_self_id());
+                        _id);
         messages.send(message);
     }
     else
@@ -390,8 +376,7 @@ void ProgramState::send_wakeup_command(string hostname, Channel<Message> &outgoi
     }
     else
     {
-        Message message(MessageType::WakeupRequest, manager.value().ip_address, _mac_address, hostname, SEND_PORT,
-                        get_self_id());
+        Message message(MessageType::WakeupRequest, manager.value().ip_address, _mac_address, hostname, SEND_PORT, _id);
         outgoing_messages.send(message);
     }
 }

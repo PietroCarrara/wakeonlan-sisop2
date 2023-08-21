@@ -29,7 +29,7 @@ class ParticipantTable
   public:
     void set_manager_mac_address(string mac_address);
     void set_self(Participant self);
-    void set_self(string hostname, string mac_address, string ip_address);
+    void set_self(string hostname, string mac_address, string ip_address, long id);
 
     optional<string> get_manager_mac_address();
 

@@ -25,6 +25,8 @@ class ProgramState
     // TODO: long _id;
     string _hostname;
     string _mac_address;
+    string _ip_address;
+    long _id;
 
     // State transitions
     void _challenge_role();

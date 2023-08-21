@@ -101,6 +101,8 @@ void state_machine(ProgramState &state, Channel<Message> &incoming_messages, Cha
 {
     while (running.is_open())
     {
+        cout << "state!" << endl;
+
         switch (state.get_state())
         {
         case StationState::SearchingManager:

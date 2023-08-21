@@ -199,9 +199,8 @@ long ParticipantTable::get_self_id()
     return self.id;
 }
 
-void ParticipantTable::set_self(string hostname, string mac_address, string ip_address)
+void ParticipantTable::set_self(string hostname, string mac_address, string ip_address, long id)
 {
-    long id = chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now().time_since_epoch()).count();
     auto self = Participant{
         .id = id,
         .hostname = hostname,

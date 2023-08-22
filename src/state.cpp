@@ -16,30 +16,14 @@ void _send_election_pong(Channel<Message> &outgoing_messages, string recipient_i
 }
 
 // Transition methods
-void ProgramState::_challenge_role()
-{
-}
-
 void ProgramState::_found_manager()
 {
     _stationState.with([&](StationState &state) { state = StationState::BeingManaged; });
 }
 
-void ProgramState::_lost_election()
-{
-}
-
-void ProgramState::_win_timeout()
-{
-}
-
 void ProgramState::_start_management()
 {
     _stationState.with([&](StationState &state) { state = StationState::Managing; });
-}
-
-void ProgramState::_manager_dead()
-{
 }
 
 void ProgramState::_start_election()
@@ -90,7 +74,13 @@ void ProgramState::search_for_manager(Channel<Message> &incoming_messages, Chann
 
 void ProgramState::be_managed(Channel<Message> &incoming_messages, Channel<Message> &outgoing_messages)
 {
-    // TODO: answer election messages, ...
+    static auto start = chrono::system_clock::now();
+
+    if (chrono::system_clock::now() - start < 5s)
+    {
+        // If 5 seconds have passed without a ping, manager is missing
+        _start_election();
+    }
 
     if (optional<Message> message = incoming_messages.receive())
     {
@@ -100,6 +90,7 @@ void ProgramState::be_managed(Channel<Message> &incoming_messages, Channel<Messa
         case MessageType::HeartbeatRequest: {
             outgoing_messages.send(
                 Message(MessageType::Heartbeat, message.value().get_ip(), _mac_address, _hostname, SEND_PORT, _id));
+            start = chrono::system_clock::now();
             break;
         }
         case MessageType::BackupTable: {
@@ -111,6 +102,13 @@ void ProgramState::be_managed(Channel<Message> &incoming_messages, Channel<Messa
                     table.set_from_backup(participants);
                 });
             }
+            start = chrono::system_clock::now();
+            break;
+        }
+        case MessageType::ElectionPing: {
+            outgoing_messages.send(
+                Message(MessageType::ElectionPong, message.value().get_ip(), _mac_address, _hostname, SEND_PORT, _id));
+            _start_election();
             break;
         }
         default:
@@ -221,6 +219,18 @@ void ProgramState::manage(Channel<Message> &incoming_messages, Channel<Message> 
             }
             case MessageType::QuitingRequest: {
                 remove_participant_by_hostname(message.value().get_sender_hostname());
+                break;
+            }
+            case MessageType::IAmTheManager: {
+                // someone challenged our role, let's fight!
+                _start_election();
+                break;
+            }
+            case MessageType::ElectionPing: {
+                // Something it's not right... why an election? Let's resolve this issue
+                outgoing_messages.send(Message(MessageType::ElectionPong, message.value().get_ip(), _mac_address,
+                                               _hostname, SEND_PORT, _id));
+                _start_election();
                 break;
             }
             default:

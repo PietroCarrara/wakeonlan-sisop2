@@ -29,12 +29,8 @@ class ProgramState
     long _id;
 
     // State transitions
-    void _challenge_role();
     void _found_manager();
-    void _lost_election();
-    void _win_timeout();
     void _start_election();
-    void _manager_dead();
     void _start_management();
 
   public:

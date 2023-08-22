@@ -87,9 +87,7 @@ optional<Datagram> Socket::receive()
     if (result)
     {
         auto received = result.value();
-        Datagram ack = Datagram{.data = "ACK", // TODO: Maybe a bit robuster, like "ACK PACKET NUMBER XXX"?
-                                .ip = received.ip};
-        // TODO: Discover which port on the other end should receive this ack
+        Datagram ack = Datagram{.data = "ACK", .ip = received.ip};
         core_send(socket_file_descriptor, ack, send_port);
     }
     lock.unlock();
@@ -101,7 +99,6 @@ bool Socket::send(Datagram packet, Port port)
     lock.lock();
     core_send(socket_file_descriptor, packet, port);
     // Wait ack from destination
-    // TODO: Receive only from a specific IP
     optional<Datagram> result = core_receive(socket_file_descriptor);
     lock.unlock();
 

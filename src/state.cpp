@@ -41,14 +41,14 @@ void ProgramState::search_for_manager(Channel<Message> &incoming_messages, Chann
 {
     auto start = chrono::system_clock::now();
 
-    while (chrono::system_clock::now() - start < 3s)
+    while (chrono::system_clock::now() - start < 3s && incoming_messages.is_open())
     {
         Message search_message(MessageType::LookingForManager, "255.255.255.255", _mac_address, _hostname, SEND_PORT,
                                _id);
         outgoing_messages.send(search_message);
 
         auto attemtp_start = chrono::system_clock::now();
-        while (chrono::system_clock::now() - attemtp_start < 1s)
+        while (chrono::system_clock::now() - attemtp_start < 1s && outgoing_messages.is_open())
         {
             if (optional<Message> message = incoming_messages.receive())
             {
@@ -337,7 +337,7 @@ ProgramState::ProgramState()
 
     // Get self mac address
     {
-        string get_mac_command = "ip link show wlp3s0 | awk '/ether/{print $2}' | tr -d '\\n'";
+        string get_mac_command = "ip link show wlps0 | awk '/ether/{print $2}' | tr -d '\\n'";
         char buffer[17];
         string result = "";
         FILE *pipe = popen(get_mac_command.c_str(), "r");

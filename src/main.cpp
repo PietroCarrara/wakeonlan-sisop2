@@ -224,6 +224,7 @@ int main(int argc, char *argv[])
 
     // Close channels
     outgoing_messages.close();
+    incoming_messages.close();
     cout << endl << "Exiting..." << endl;
 
     // detach everyone

@@ -6,6 +6,7 @@
 #include "consts.h"
 #include "message.h"
 #include "participantTable.h"
+#include <limits.h>
 #include <optional>
 #include <vector>
 
@@ -22,7 +23,6 @@ class ProgramState
   private:
     Atomic<StationState> _stationState;
     Atomic<ParticipantTable> _participants;
-    // TODO: long _id;
     string _hostname;
     string _mac_address;
     string _ip_address;

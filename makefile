@@ -13,7 +13,7 @@ $(PROJECT):
 # --------------
 # RECIPES ONLY:
 .PHONY: start_station
-client: 
+start_station: 
 	./$(OUT_DIR)/$(PROJECT)
 
 .PHONY: clear_build

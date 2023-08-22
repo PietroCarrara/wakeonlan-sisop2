@@ -1,52 +1,45 @@
 #ifndef CHANNEL_H
 #define CHANNEL_H
 
+#include <iostream>
+#include <mutex>
 #include <optional>
-#include <semaphore>
-
 using namespace std;
 
 template <typename T> class Channel
 {
   private:
-    binary_semaphore senders = binary_semaphore{1};
-    binary_semaphore receivers = binary_semaphore{0};
+    mutex senders;
     bool open = true;
     optional<T> data;
 
   public:
     void send(T to_send)
     {
-        senders.acquire();
+        senders.lock();
         if (!open)
         {
             throw exception();
         }
-
         data = to_send;
-        receivers.release();
+        senders.unlock();
     }
 
     optional<T> receive()
     {
-        receivers.acquire();
-        if (!open)
+        if (!open || !data.has_value())
         {
             return {};
         }
-
         T result = data.value();
         data = {};
-        senders.release();
         return result;
     }
 
     void close()
     {
-        senders.acquire();
         open = false;
         data = {};
-        receivers.release();
     }
 
     bool is_open()

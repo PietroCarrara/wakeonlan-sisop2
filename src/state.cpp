@@ -308,7 +308,7 @@ ProgramState::ProgramState()
 
     // Get self ip address
     {
-        string get_ip_address_command = "hostname -i | awk '{print $1}'";
+        string get_ip_address_command = "hostname -i | awk '{print $1}' | tr -d '\\n'";
         char buffer[16];
         string result = "";
         FILE *pipe = popen(get_ip_address_command.c_str(), "r");
@@ -362,6 +362,7 @@ void ProgramState::send_wakeup_command(string hostname, Channel<Message> &outgoi
     if (!manager)
     {
         cout << "Manager could not be found..." << endl;
+        return;
     }
 
     // Special case if we're the manager: Wakeup the target directly

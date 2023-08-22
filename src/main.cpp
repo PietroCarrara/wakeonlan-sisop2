@@ -43,7 +43,7 @@ void graceful_shutdown(ProgramState &state, Channel<Message> &outgoing_messages,
 
     if (running.is_open())
     {
-        if (state.get_state() != StationState::Managing)
+        if (state.get_state() != StationState::Managing && state.get_state() != StationState::SearchingManager)
         {
             state.send_exit_request(outgoing_messages);
         }
@@ -56,42 +56,45 @@ void graceful_shutdown(ProgramState &state, Channel<Message> &outgoing_messages,
 
 void message_sender(Channel<Message> &outgoing_messages, Socket &socket, Channel<None> &running)
 {
-    while (auto msg_maybe = outgoing_messages.receive())
+    while (running.is_open())
     {
-        Message msg = msg_maybe.value();
-        string data = msg.encode();
-
-        Datagram packet = Datagram{.data = data, .ip = msg.get_ip()};
-
-        int i = 0;
-        switch (msg.get_message_type())
+        if (optional<Message> msg_maybe = outgoing_messages.receive())
         {
-        // Only important outgoing_messages should be resent
-        case MessageType::WakeupRequest:
-            // Try 10 times
-            while (!socket.send(packet, SEND_PORT) && i < 10)
+            Message msg = msg_maybe.value();
+            string data = msg.encode();
+
+            Datagram packet = Datagram{.data = data, .ip = msg.get_ip()};
+
+            int i = 0;
+            switch (msg.get_message_type())
             {
-                i++;
+            // Only important outgoing_messages should be resent
+            case MessageType::WakeupRequest:
+                // Try 10 times
+                while (!socket.send(packet, SEND_PORT) && i < 10)
+                {
+                    i++;
+                }
+                break;
+            case MessageType::QuitingRequest:
+                // Try 10 times
+                while (!socket.send(packet, SEND_PORT) && i < 10)
+                {
+                    i++;
+                }
+                if (i == 10)
+                {
+                    cout << endl << "Unable to signal your exit to the manager, try again" << endl;
+                }
+                else
+                {
+                    running.close();
+                }
+                break;
+            default:
+                socket.send(packet, SEND_PORT);
+                break;
             }
-            break;
-        case MessageType::QuitingRequest:
-            // Try 10 times
-            while (!socket.send(packet, SEND_PORT) && i < 10)
-            {
-                i++;
-            }
-            if (i == 10)
-            {
-                cout << endl << "Unable to signal your exit to the manager, try again" << endl;
-            }
-            else
-            {
-                running.close();
-            }
-            break;
-        default:
-            socket.send(packet, SEND_PORT);
-            break;
         }
     }
 }
@@ -101,7 +104,6 @@ void state_machine(ProgramState &state, Channel<Message> &incoming_messages, Cha
 {
     while (running.is_open())
     {
-        cout << "state!" << endl;
 
         switch (state.get_state())
         {
@@ -158,7 +160,7 @@ void command_subservice(ProgramState &state, Channel<Message> &outgoing_messages
         }
         else if (command == "EXIT" || cin.eof())
         {
-            if (state.get_state() != StationState::Managing)
+            if (state.get_state() != StationState::Managing && state.get_state() != StationState::SearchingManager)
             {
                 state.send_exit_request(outgoing_messages);
             }
@@ -176,6 +178,7 @@ void command_subservice(ProgramState &state, Channel<Message> &outgoing_messages
 
 void interface_subservice(ProgramState &state, Channel<None> &running)
 {
+    state.print_participants();
     ParticipantTable previous_table = state.clone_participants();
 
     while (running.is_open())
@@ -185,6 +188,7 @@ void interface_subservice(ProgramState &state, Channel<None> &running)
             previous_table = state.clone_participants();
             state.print_participants();
         }
+        this_thread::sleep_for(200ms);
     }
 }
 

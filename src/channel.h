@@ -21,7 +21,7 @@ template <typename T> class Channel
         lock.acquire();
         if (!open)
         {
-            throw exception("error: cannot send data through channel when it's closed");
+            throw exception();
         }
         data.push_back(to_send);
         lock.release();

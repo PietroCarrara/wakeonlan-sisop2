@@ -2,44 +2,60 @@
 #define CHANNEL_H
 
 #include <iostream>
-#include <mutex>
 #include <optional>
+#include <semaphore>
+#include <vector>
+
 using namespace std;
 
 template <typename T> class Channel
 {
   private:
-    mutex senders;
+    binary_semaphore lock = binary_semaphore{1};
     bool open = true;
-    optional<T> data;
+    vector<T> data;
 
   public:
     void send(T to_send)
     {
-        senders.lock();
+        lock.acquire();
         if (!open)
         {
-            throw exception();
+            throw exception("error: cannot send data through channel when it's closed");
         }
-        data = to_send;
-        senders.unlock();
+        data.push_back(to_send);
+        lock.release();
     }
 
     optional<T> receive()
     {
-        if (!open || !data.has_value())
+        lock.acquire();
+
+        if (!open)
         {
             return {};
         }
-        T result = data.value();
-        data = {};
+
+        optional<T> result = {};
+
+        if (data.size() > 0)
+        {
+            result = data.front();
+            data.erase(data.begin());
+        }
+
+        lock.release();
         return result;
     }
 
     void close()
     {
+        lock.acquire();
+
         open = false;
-        data = {};
+        data.clear();
+
+        lock.release();
     }
 
     bool is_open()

@@ -16,8 +16,9 @@ void _send_election_pong(Channel<Message> &outgoing_messages, string recipient_i
 }
 
 // Transition methods
-void ProgramState::_found_manager()
+void ProgramState::_found_manager(string manager_mac_address)
 {
+    _participants.with([&](ParticipantTable &table) { table.set_manager_mac_address(manager_mac_address); });
     _stationState.with([&](StationState &state) { state = StationState::BeingManaged; });
 }
 
@@ -50,13 +51,13 @@ void ProgramState::search_for_manager(Channel<Message> &incoming_messages, Chann
         auto attemtp_start = chrono::system_clock::now();
         while (chrono::system_clock::now() - attemtp_start < 1s && outgoing_messages.is_open())
         {
-            if (optional<Message> message = incoming_messages.receive())
+            optional<Message> message = incoming_messages.receive();
+            if (message.has_value())
             {
-
                 switch (message.value().get_message_type())
                 {
                 case MessageType::IAmTheManager:
-                    _found_manager();
+                    _found_manager(message.value().get_mac_address());
                     return;
                 case MessageType::ElectionPing:
                     _send_election_pong(outgoing_messages, message.value().get_ip(), _mac_address, _hostname, _id);
@@ -152,14 +153,14 @@ void ProgramState::run_election(Channel<Message> &incoming_messages, Channel<Mes
         auto attemtp_start = chrono::system_clock::now();
         while (attemtp_start - chrono::system_clock::now() < 1s)
         {
-            if (optional<Message> message = incoming_messages.receive())
+            optional<Message> message = incoming_messages.receive();
+            if (message.has_value())
             {
-
                 switch (message.value().get_message_type())
                 {
                 // If someone already won the elections, be respectful and accept to be managed
                 case MessageType::IAmTheManager:
-                    _found_manager();
+                    _found_manager(message.value().get_mac_address());
                     return;
                 // If someone is lost and want a new election, just shut them up
                 case MessageType::ElectionPing:
@@ -192,7 +193,9 @@ void ProgramState::manage(Channel<Message> &incoming_messages, Channel<Message> 
 
     while (chrono::system_clock::now() - waiting < 5s)
     {
-        if (optional<Message> message = incoming_messages.receive())
+        optional<Message> message = incoming_messages.receive();
+
+        if (message.has_value())
         {
             switch (message.value().get_message_type())
             {
@@ -231,6 +234,12 @@ void ProgramState::manage(Channel<Message> &incoming_messages, Channel<Message> 
                 outgoing_messages.send(Message(MessageType::ElectionPong, message.value().get_ip(), _mac_address,
                                                _hostname, SEND_PORT, _id));
                 _start_election();
+                break;
+            }
+            case MessageType::HeartbeatRequest: {
+                // someone took our job!
+                // thats fine
+                _found_manager(message.value().get_mac_address());
                 break;
             }
             default:
@@ -318,7 +327,7 @@ ProgramState::ProgramState()
 
     // Get self ip address
     {
-        string get_ip_address_command = "hostname -i | awk '{print $1}' | tr -d '\\n'";
+        string get_ip_address_command = "hostname -I | awk '{print $1}' | tr -d '\\n'";
         char buffer[16];
         string result = "";
         FILE *pipe = popen(get_ip_address_command.c_str(), "r");
@@ -337,7 +346,7 @@ ProgramState::ProgramState()
 
     // Get self mac address
     {
-        string get_mac_command = "ip link show wlps0 | awk '/ether/{print $2}' | tr -d '\\n'";
+        string get_mac_command = "/sbin/ip link show enp2s0 | awk '/ether/{print $2}' | tr -d '\\n'";
         char buffer[17];
         string result = "";
         FILE *pipe = popen(get_mac_command.c_str(), "r");

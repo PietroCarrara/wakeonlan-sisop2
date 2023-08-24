@@ -75,58 +75,63 @@ void ProgramState::search_for_manager(Channel<Message> &incoming_messages, Chann
 
 void ProgramState::be_managed(Channel<Message> &incoming_messages, Channel<Message> &outgoing_messages)
 {
-    static auto start = chrono::system_clock::now();
+    auto start = chrono::system_clock::now();
 
-    if (chrono::system_clock::now() - start < 5s)
+    auto last_message_sent_from_manager = chrono::system_clock::now();
+
+    while (chrono::system_clock::now() - start < 5s)
     {
-        // If 5 seconds have passed without a ping, manager is missing
-        _start_election();
-    }
+        optional<Message> message = incoming_messages.receive();
 
-    optional<Message> message = incoming_messages.receive();
-
-    if (message.has_value())
-    {
-        switch (message.value().get_message_type())
+        if (message.has_value())
         {
-            // answer pings
-        case MessageType::HeartbeatRequest: {
-            outgoing_messages.send(
-                Message(MessageType::Heartbeat, message.value().get_ip(), _mac_address, _hostname, SEND_PORT, _id));
-            start = chrono::system_clock::now();
-            break;
-        }
-        case MessageType::BackupTable: {
-            string manager_mac_address =
-                _participants.compute([&](ParticipantTable &table) { table.get_manager_mac_address(); });
-
-            if (manager_mac_address != message.value().get_mac_address())
+            switch (message.value().get_message_type())
             {
-                // sus
+                // answer pings
+            case MessageType::HeartbeatRequest: {
+                outgoing_messages.send(
+                    Message(MessageType::Heartbeat, message.value().get_ip(), _mac_address, _hostname, SEND_PORT, _id));
+                last_message_sent_from_manager = chrono::system_clock::now();
+                break;
+            }
+            case MessageType::BackupTable: {
+                string manager_mac_address =
+                    _participants.compute([&](ParticipantTable &table) { table.get_manager_mac_address(); });
+
+                if (manager_mac_address != message.value().get_mac_address())
+                {
+                    // sus
+                    _start_election();
+                    return;
+                }
+
+                optional<string> body = message.value().get_body();
+                if (body.has_value())
+                {
+                    _participants.with([&](ParticipantTable &table) {
+                        vector<Participant> participants = table.deserialize(body.value());
+                        table.set_from_backup(participants);
+                    });
+                }
+                last_message_sent_from_manager = chrono::system_clock::now();
+                break;
+            }
+            case MessageType::ElectionPing: {
+                outgoing_messages.send(Message(MessageType::ElectionPong, message.value().get_ip(), _mac_address,
+                                               _hostname, SEND_PORT, _id));
                 _start_election();
                 return;
             }
-
-            optional<string> body = message.value().get_body();
-            if (body.has_value())
-            {
-                _participants.with([&](ParticipantTable &table) {
-                    vector<Participant> participants = table.deserialize(body.value());
-                    table.set_from_backup(participants);
-                });
+            default:
+                break;
             }
-            start = chrono::system_clock::now();
-            break;
         }
-        case MessageType::ElectionPing: {
-            outgoing_messages.send(
-                Message(MessageType::ElectionPong, message.value().get_ip(), _mac_address, _hostname, SEND_PORT, _id));
-            _start_election();
-            break;
-        }
-        default:
-            break;
-        }
+    }
+
+    if (chrono::system_clock::now() - last_message_sent_from_manager > 5s)
+    {
+        // If 5 seconds have passed without a ping, manager is missing
+        _start_election();
     }
 }
 

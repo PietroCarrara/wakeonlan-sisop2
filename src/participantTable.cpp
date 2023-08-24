@@ -237,6 +237,12 @@ string ParticipantTable::serialize()
 {
     string table = "";
 
+    string str_version = to_string(_version);
+    increment_table_version();
+
+    table.append(str_version);
+    table.append("!");
+
     for (long unsigned int i = 0; i < participants.size(); i++)
     {
         auto participant = participants[i];
@@ -266,17 +272,22 @@ vector<Participant> ParticipantTable::deserialize(string data)
 {
     vector<Participant> participants;
 
-    vector<string> data_tokens = StringExtensions::split(data, '#');
+    vector<string> data_tokens = StringExtensions::split(data, '!');
 
-    for (auto participant : data_tokens)
+    long version = stol(data_tokens[0]);
+    set_table_version(version);
+
+    vector<string> participants_tokens = StringExtensions::split(data_tokens[1], '#');
+
+    for (auto participant : participants_tokens)
     {
-        vector<string> participant_tokens = StringExtensions::split(data, ',');
+        vector<string> tokens = StringExtensions::split(data, ',');
 
-        long id = stol(participant_tokens[0]);
-        auto last_time_seen_alive = time_point_from_string(participant_tokens[1]);
-        string hostname = participant_tokens[2];
-        string ip_address = participant_tokens[3];
-        string mac_address = participant_tokens[4];
+        long id = stol(tokens[0]);
+        auto last_time_seen_alive = time_point_from_string(tokens[1]);
+        string hostname = tokens[2];
+        string ip_address = tokens[3];
+        string mac_address = tokens[4];
 
         participants.push_back(Participant{
             .id = id,
@@ -296,4 +307,19 @@ void ParticipantTable::set_from_backup(vector<Participant> participants)
     {
         add_or_update_participant(participant);
     }
+}
+
+long ParticipantTable::get_table_version()
+{
+    return _version;
+}
+
+void ParticipantTable::increment_table_version()
+{
+    _version++;
+}
+
+void ParticipantTable::set_table_version(long version)
+{
+    _version = version;
 }

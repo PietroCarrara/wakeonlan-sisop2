@@ -25,6 +25,7 @@ class ParticipantTable
     optional<string> manager_mac_address;
     Participant self;
     vector<Participant> participants;
+    long _version = 0;
 
   public:
     void set_manager_mac_address(string mac_address);
@@ -54,6 +55,10 @@ class ParticipantTable
     vector<Participant> deserialize(string data);
 
     void set_from_backup(vector<Participant> participants);
+
+    long get_table_version();
+    void increment_table_version();
+    void set_table_version(long version);
 };
 
 #endif

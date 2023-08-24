@@ -24,6 +24,7 @@ void ProgramState::_found_manager(string manager_mac_address)
 
 void ProgramState::_start_management()
 {
+    _participants.with([&](ParticipantTable &table) { table.set_manager_mac_address(_mac_address); });
     _stationState.with([&](StationState &state) { state = StationState::Managing; });
 }
 

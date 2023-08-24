@@ -83,7 +83,9 @@ void ProgramState::be_managed(Channel<Message> &incoming_messages, Channel<Messa
         _start_election();
     }
 
-    if (optional<Message> message = incoming_messages.receive())
+    optional<Message> message = incoming_messages.receive();
+
+    if (message.has_value())
     {
         switch (message.value().get_message_type())
         {
@@ -95,6 +97,16 @@ void ProgramState::be_managed(Channel<Message> &incoming_messages, Channel<Messa
             break;
         }
         case MessageType::BackupTable: {
+            string manager_mac_address =
+                _participants.compute([&](ParticipantTable &table) { table.get_manager_mac_address(); });
+
+            if (manager_mac_address != message.value().get_mac_address())
+            {
+                // sus
+                _start_election();
+                return;
+            }
+
             optional<string> body = message.value().get_body();
             if (body.has_value())
             {

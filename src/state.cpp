@@ -90,6 +90,16 @@ void ProgramState::be_managed(Channel<Message> &incoming_messages, Channel<Messa
             {
                 // answer pings
             case MessageType::HeartbeatRequest: {
+                optional<string> manager_mac_address =
+                    _participants.compute([&](ParticipantTable &table) { return table.get_manager_mac_address(); });
+
+                if (manager_mac_address.value() != message.value().get_mac_address())
+                {
+                    // sus
+                    _start_election();
+                    return;
+                }
+
                 outgoing_messages.send(
                     Message(MessageType::Heartbeat, message.value().get_ip(), _mac_address, _hostname, SEND_PORT, _id));
                 last_message_sent_from_manager = chrono::system_clock::now();

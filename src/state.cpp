@@ -96,10 +96,10 @@ void ProgramState::be_managed(Channel<Message> &incoming_messages, Channel<Messa
                 break;
             }
             case MessageType::BackupTable: {
-                string manager_mac_address =
-                    _participants.compute([&](ParticipantTable &table) { table.get_manager_mac_address(); });
+                optional<string> manager_mac_address =
+                    _participants.compute([&](ParticipantTable &table) { return table.get_manager_mac_address(); });
 
-                if (manager_mac_address != message.value().get_mac_address())
+                if (manager_mac_address.value() != message.value().get_mac_address())
                 {
                     // sus
                     _start_election();

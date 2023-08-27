@@ -374,7 +374,7 @@ ProgramState::ProgramState()
 
     // Get self mac address
     {
-        string get_mac_command = "/sbin/ip link show enp2s0 | awk '/ether/{print $2}' | tr -d '\\n'";
+        string get_mac_command = "ip link show | awk '/ether/{print $2}' | tail -n 1 | tr -d '\\n'";
         char buffer[17];
         string result = "";
         FILE *pipe = popen(get_mac_command.c_str(), "r");

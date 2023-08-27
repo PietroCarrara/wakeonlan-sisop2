@@ -5,8 +5,10 @@
 #include <iostream>
 #include <optional>
 #include <semaphore>
+#include <stdio.h>
 #include <string>
 #include <thread>
+#include <unistd.h>
 #include <vector>
 
 #include "atomic.h"
@@ -145,6 +147,12 @@ void message_receiver(Channel<Message> &incoming_messages, Socket &socket, Chann
 void command_subservice(ProgramState &state, Channel<Message> &outgoing_messages, Channel<None> &running)
 {
     string input;
+
+    // Determine if not running in interactive environment (i.e. can't read from user)
+    if (!isatty(fileno(stdin)))
+    {
+        return;
+    }
 
     while (running.is_open())
     {

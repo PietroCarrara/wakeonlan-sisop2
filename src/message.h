@@ -26,17 +26,19 @@ enum struct MessageType
 /**
  * Message members will be enconded in csv format, for example:
  * message_type = 3
- * ip = 1.2.3.4
+ * sender_ip = 1.2.3.4
+ * destination_ip = 5.6.7.8
  * mac_address = 55:55:55:55:55:55
  * sender_hostname = h-666.6.6
  * port = 777
- * encoded message: "3;1.2.3.4;55:55:55:55:55:55;h-666.6.6;777"
+ * encoded message: "3;1.2.3.4;5.6.7.8;55:55:55:55:55:55;h-666.6.6;777"
  * */
 class Message
 {
   private:
     MessageType _message_type;
-    string _ip;
+    string _sender_ip;
+    string _destination_ip;
     string _mac_address;
     string _sender_hostname;
     int _port;
@@ -44,12 +46,14 @@ class Message
     optional<string> _body;
 
   public:
-    Message(MessageType message_type, string ip, string mac_address, string sender_hostname, int port, long sender_id);
-    Message(MessageType message_type, string ip, string mac_address, string sender_hostname, int port, long sender_id,
-            optional<string> body);
+    Message(MessageType message_type, string sender_ip, string destination_ip, string mac_address,
+            string sender_hostname, int port, long sender_id);
+    Message(MessageType message_type, string sender_ip, string destination_ip, string mac_address,
+            string sender_hostname, int port, long sender_id, optional<string> body);
 
     MessageType get_message_type();
-    string get_ip();
+    string get_destination_ip();
+    string get_sender_ip();
     string get_mac_address();
     string get_sender_hostname();
     int get_port();

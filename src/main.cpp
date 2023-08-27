@@ -65,7 +65,7 @@ void message_sender(Channel<Message> &outgoing_messages, Socket &socket, Channel
             Message msg = msg_maybe.value();
             string data = msg.encode();
 
-            Datagram packet = Datagram{.data = data, .ip = msg.get_ip()};
+            Datagram packet = Datagram{.data = data, .ip = msg.get_destination_ip()};
 
             int i = 0;
             switch (msg.get_message_type())
@@ -222,7 +222,7 @@ int main(int argc, char *argv[])
     threads.push_back(thread(message_receiver, ref(incoming_messages), ref(socket), ref(running)));
     threads.push_back(thread(message_sender, ref(outgoing_messages), ref(socket), ref(running)));
     threads.push_back(thread(interface_subservice, ref(state), ref(running)));
-    // threads.push_back(thread(graceful_shutdown, ref(state), ref(outgoing_messages), ref(running)));
+    threads.push_back(thread(graceful_shutdown, ref(state), ref(outgoing_messages), ref(running)));
 
     detach_threads.push_back(thread(command_subservice, ref(state), ref(outgoing_messages), ref(running)));
 

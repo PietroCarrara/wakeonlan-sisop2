@@ -175,11 +175,11 @@ void ProgramState::run_election(Channel<Message> &incoming_messages, Channel<Mes
     });
 
     auto start = chrono::system_clock::now();
-    while (start - chrono::system_clock::now() < 5s)
+    while (chrono::system_clock::now() - start < 5s)
     {
         // Wait pong from others
         auto attemtp_start = chrono::system_clock::now();
-        while (attemtp_start - chrono::system_clock::now() < 1s)
+        while (chrono::system_clock::now() - attemtp_start < 1s)
         {
             optional<Message> message = incoming_messages.receive();
             if (message.has_value())

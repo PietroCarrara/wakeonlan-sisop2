@@ -78,7 +78,6 @@ void ParticipantTable::print()
 
     string parsed_manager_mac_address = manager_mac_address ? manager_mac_address.value() : "No Manager MAC Address";
 
-    system("clear");
     cout << "Manager MAC Address: " << parsed_manager_mac_address << endl << endl;
     cout << "Participants:" << endl;
     cout << "|";

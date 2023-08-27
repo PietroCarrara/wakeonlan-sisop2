@@ -185,6 +185,7 @@ void command_subservice(ProgramState &state, Channel<Message> &outgoing_messages
 
 void interface_subservice(ProgramState &state, Channel<None> &running)
 {
+    system("clear");
     state.print_participants();
     ParticipantTable previous_table = state.clone_participants();
 
@@ -193,6 +194,7 @@ void interface_subservice(ProgramState &state, Channel<None> &running)
         if (!state.is_participants_equal(previous_table))
         {
             previous_table = state.clone_participants();
+            system("clear");
             state.print_participants();
         }
         this_thread::sleep_for(200ms);
@@ -220,7 +222,7 @@ int main(int argc, char *argv[])
     threads.push_back(thread(message_receiver, ref(incoming_messages), ref(socket), ref(running)));
     threads.push_back(thread(message_sender, ref(outgoing_messages), ref(socket), ref(running)));
     threads.push_back(thread(interface_subservice, ref(state), ref(running)));
-    threads.push_back(thread(graceful_shutdown, ref(state), ref(outgoing_messages), ref(running)));
+    // threads.push_back(thread(graceful_shutdown, ref(state), ref(outgoing_messages), ref(running)));
 
     detach_threads.push_back(thread(command_subservice, ref(state), ref(outgoing_messages), ref(running)));
 

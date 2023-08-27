@@ -48,7 +48,7 @@ class ProgramState
     optional<Participant> get_manager();
     void ping_members(Channel<Message> &messages);
     ParticipantTable clone_participants();
-    void print_participants();
+    void print_state();
     bool is_participants_equal(ParticipantTable table);
     void add_or_update_participant(Participant participant);
     void remove_participant_by_hostname(string hostname);

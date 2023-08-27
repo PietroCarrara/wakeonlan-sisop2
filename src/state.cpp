@@ -15,6 +15,23 @@ void _send_election_pong(Channel<Message> &outgoing_messages, string recipient_i
     outgoing_messages.send(pong_message);
 }
 
+string station_state_to_string(StationState state)
+{
+    switch (state)
+    {
+    case StationState::SearchingManager:
+        return "SearchingManager";
+    case StationState::InElection:
+        return "InElection";
+    case StationState::Managing:
+        return "Managing";
+    case StationState::BeingManaged:
+        return "BeingManaged";
+    }
+
+    return "UNKNOWN";
+}
+
 // Transition methods
 void ProgramState::_found_manager(string manager_mac_address)
 {
@@ -332,8 +349,10 @@ ParticipantTable ProgramState::clone_participants()
     return _participants.compute([&](ParticipantTable &table) { return table.clone(); });
 }
 
-void ProgramState::print_participants()
+void ProgramState::print_state()
 {
+    cout << "Station State: " << station_state_to_string(get_state()) << endl;
+
     _participants.with([&](ParticipantTable &table) { table.print(); });
 }
 

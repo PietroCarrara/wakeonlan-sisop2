@@ -186,7 +186,7 @@ void command_subservice(ProgramState &state, Channel<Message> &outgoing_messages
 void interface_subservice(ProgramState &state, Channel<None> &running)
 {
     system("clear");
-    state.print_participants();
+    state.print_state();
     ParticipantTable previous_table = state.clone_participants();
 
     while (running.is_open())
@@ -195,7 +195,7 @@ void interface_subservice(ProgramState &state, Channel<None> &running)
         {
             previous_table = state.clone_participants();
             system("clear");
-            state.print_participants();
+            state.print_state();
         }
         this_thread::sleep_for(200ms);
     }

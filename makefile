@@ -7,14 +7,18 @@ OUT_DIR = build
 all: $(PROJECT)
 
 # build app
-$(PROJECT): 
+$(PROJECT):
 	$(CC) $(CFLAGS) -o $(OUT_DIR)/$(PROJECT) $(SRC_FILES)
 
 # --------------
 # RECIPES ONLY:
 .PHONY: start_station
-start_station: 
+start_station:
 	./$(OUT_DIR)/$(PROJECT)
+
+.PHONY: docker
+docker:
+	docker compose up --build
 
 .PHONY: clear_build
 clear_build:

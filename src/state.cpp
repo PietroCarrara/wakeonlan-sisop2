@@ -33,9 +33,19 @@ string station_state_to_string(StationState state)
 }
 
 // Transition methods
-void ProgramState::_found_manager(string manager_mac_address)
+void ProgramState::_found_manager(Message i_am_the_manager_message)
 {
-    _participants.with([&](ParticipantTable &table) { table.set_manager_mac_address(manager_mac_address); });
+
+    _participants.with([&](ParticipantTable &table) {
+        table.add_or_update_participant(Participant{
+            .id = i_am_the_manager_message.get_sender_id(),
+            .hostname = i_am_the_manager_message.get_sender_hostname(),
+            .mac_address = i_am_the_manager_message.get_mac_address(),
+            .ip_address = i_am_the_manager_message.get_sender_ip(),
+            .last_time_seen_alive = chrono::system_clock::now(),
+        });
+        table.set_manager_mac_address(i_am_the_manager_message.get_mac_address());
+    });
     _stationState.with([&](StationState &state) { state = StationState::BeingManaged; });
 }
 
@@ -75,7 +85,7 @@ void ProgramState::search_for_manager(Channel<Message> &incoming_messages, Chann
                 switch (message.value().get_message_type())
                 {
                 case MessageType::IAmTheManager:
-                    _found_manager(message.value().get_mac_address());
+                    _found_manager(message.value());
                     return;
                 case MessageType::ElectionPing:
                     _send_election_pong(outgoing_messages, message.value().get_sender_ip(), _ip_address, _mac_address,
@@ -206,7 +216,7 @@ void ProgramState::run_election(Channel<Message> &incoming_messages, Channel<Mes
                 {
                 // If someone already won the elections, be respectful and accept to be managed
                 case MessageType::IAmTheManager:
-                    _found_manager(message.value().get_mac_address());
+                    _found_manager(message.value());
                     return;
                 // If someone is lost and want a new election, just shut them up
                 case MessageType::ElectionPing:
@@ -237,8 +247,7 @@ void ProgramState::manage(Channel<Message> &incoming_messages, Channel<Message> 
 
     // wait for client messages
     auto waiting = chrono::system_clock::now();
-
-    while (chrono::system_clock::now() - waiting < 5s)
+    while (chrono::system_clock::now() - waiting < 2s)
     {
         optional<Message> message = incoming_messages.receive();
 
@@ -286,7 +295,7 @@ void ProgramState::manage(Channel<Message> &incoming_messages, Channel<Message> 
             case MessageType::HeartbeatRequest: {
                 // someone took our job!
                 // thats fine
-                _found_manager(message.value().get_mac_address());
+                _found_manager(message.value());
                 break;
             }
             default:

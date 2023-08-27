@@ -29,7 +29,7 @@ class ProgramState
     long _id;
 
     // State transitions
-    void _found_manager(string manager_mac_address);
+    void _found_manager(Message i_am_the_manager_message);
     void _start_election();
     void _start_management();
 

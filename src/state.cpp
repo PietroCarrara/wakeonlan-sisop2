@@ -180,7 +180,8 @@ void ProgramState::run_election(Channel<Message> &incoming_messages, Channel<Mes
         vector<Participant> participants = table.get_participants();
         vector<Participant> older_stations;
 
-        std::copy(participants.begin(), participants.end(), std::back_inserter(older_stations));
+        std::copy_if(participants.begin(), participants.end(), std::back_inserter(older_stations),
+                     [&](Participant participant) { return participant.id < _id; });
         return older_stations;
     });
 
@@ -193,13 +194,11 @@ void ProgramState::run_election(Channel<Message> &incoming_messages, Channel<Mes
         return;
     }
 
-    _participants.with([&](ParticipantTable &table) {
-        for (auto &member : older_stations)
-        {
-            outgoing_messages.send(Message(MessageType::ElectionPing, _ip_address, member.ip_address,
-                                           member.mac_address, _hostname, SEND_PORT, _id));
-        }
-    });
+    for (auto &member : older_stations)
+    {
+        outgoing_messages.send(Message(MessageType::ElectionPing, _ip_address, member.ip_address, member.mac_address,
+                                       _hostname, SEND_PORT, _id));
+    }
 
     auto start = chrono::system_clock::now();
     while (chrono::system_clock::now() - start < 5s)
@@ -309,11 +308,12 @@ void ProgramState::manage(Channel<Message> &incoming_messages, Channel<Message> 
         string table_serialized = table.serialize();
         for (auto &member : table.get_participants())
         {
-            if (member.id == _id) {
+            if (member.id == _id)
+            {
                 continue;
             }
-            
-            outgoing_messages.send(Message(MessageType::BackupTable, _ip_address, member.ip_address, member.mac_address,
+
+            outgoing_messages.send(Message(MessageType::BackupTable, _ip_address, member.ip_address, _mac_address,
                                            _hostname, SEND_PORT, _id, table_serialized));
         }
     });

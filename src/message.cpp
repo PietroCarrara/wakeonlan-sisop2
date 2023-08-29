@@ -1,6 +1,32 @@
 
 #include "message.h"
 
+string message_type_to_string(MessageType message_type)
+{
+    switch (message_type)
+    {
+        case MessageType::Heartbeat:
+            return "Heartbeat";
+        case MessageType::WakeupRequest:
+            return "WakeupRequest";
+        case MessageType::LookingForManager:
+            return "LookingForManager";
+        case MessageType::IAmTheManager:
+            return "IAmTheManager";
+        case MessageType::HeartbeatRequest:
+            return "HeartbeatRequest";
+        case MessageType::QuitingRequest:
+            return "QuitingRequest";
+        case MessageType::BackupTable:
+            return "BackupTable";
+        case MessageType::ElectionPing:
+            return "ElectionPing";
+        case MessageType::ElectionPong:
+            return "ElectionPong";
+    }
+    return "UNKNOWN";
+}
+
 Message Message::decode(string data)
 {
     // For now, we assume the data will allways arrive with the desired format

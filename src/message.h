@@ -23,6 +23,8 @@ enum struct MessageType
     ElectionPong  // A station answers this to stations that sent a ElectionPing
 };
 
+string message_type_to_string(MessageType message_type);
+
 /**
  * Message members will be enconded in csv format, for example:
  * message_type = 3

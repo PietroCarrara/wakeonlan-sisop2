@@ -27,6 +27,7 @@ struct None
 };
 
 bool received_sigint = false;
+constexpr bool debug = false;
 
 void signal_handler(int signal_number)
 {
@@ -64,6 +65,9 @@ void message_sender(Channel<Message> &outgoing_messages, Socket &socket, Channel
         {
             Message msg = msg_maybe.value();
             string data = msg.encode();
+            if (debug) {
+                cout << "sending: " << message_type_to_string(msg.get_message_type()) << endl;
+            }
 
             Datagram packet = Datagram{.data = data, .ip = msg.get_destination_ip()};
 
@@ -140,6 +144,9 @@ void message_receiver(Channel<Message> &incoming_messages, Socket &socket, Chann
 
         Datagram datagram = datagram_option.value();
         Message message = Message::decode(datagram.data);
+        if (debug) {
+            cout << "received: " << message_type_to_string(message.get_message_type()) << endl;
+        }
         incoming_messages.send(message);
     }
 }
@@ -185,17 +192,29 @@ void command_subservice(ProgramState &state, Channel<Message> &outgoing_messages
 
 void interface_subservice(ProgramState &state, Channel<None> &running)
 {
-    system("clear");
-    state.print_state();
     ParticipantTable previous_table = state.clone_participants();
+    StationState previous_state = state.get_state();
+
+    if (debug) {
+        cout << "state: " << station_state_to_string(state.get_state()) << endl;
+    } else {
+        system("clear");
+        state.print_state();
+    }
 
     while (running.is_open())
     {
-        if (!state.is_participants_equal(previous_table))
+        if (!state.is_participants_equal(previous_table) || previous_state != state.get_state())
         {
             previous_table = state.clone_participants();
-            system("clear");
-            state.print_state();
+            previous_state = state.get_state();
+
+            if (debug) {
+                cout << "state: " << station_state_to_string(state.get_state()) << endl;
+            } else {
+                system("clear");
+                state.print_state();
+            }
         }
         this_thread::sleep_for(200ms);
     }
@@ -222,7 +241,9 @@ int main(int argc, char *argv[])
     threads.push_back(thread(message_receiver, ref(incoming_messages), ref(socket), ref(running)));
     threads.push_back(thread(message_sender, ref(outgoing_messages), ref(socket), ref(running)));
     threads.push_back(thread(interface_subservice, ref(state), ref(running)));
-    threads.push_back(thread(graceful_shutdown, ref(state), ref(outgoing_messages), ref(running)));
+    if (!debug) {
+        threads.push_back(thread(graceful_shutdown, ref(state), ref(outgoing_messages), ref(running)));
+    }
 
     detach_threads.push_back(thread(command_subservice, ref(state), ref(outgoing_messages), ref(running)));
 

@@ -18,6 +18,8 @@ enum struct StationState
     BeingManaged,
 };
 
+string station_state_to_string(StationState state);
+
 class ProgramState
 {
   private:

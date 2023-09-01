@@ -39,7 +39,7 @@ Message Message::decode(string data)
     string sender_hostname = data_tokens[4];
     int port = stoi(data_tokens[5]);
     long sender_id = stol(data_tokens[6]);
-    optional<string> body = data_tokens[7] == "" ? nullopt : optional<string>{data_tokens[6]};
+    optional<string> body = data_tokens[7] == "" ? nullopt : optional<string>{data_tokens[7]};
 
     Message decodedMessage(message_type, _sender_ip, _destination_ip, mac_address, sender_hostname, port, sender_id,
                            body);

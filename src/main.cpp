@@ -27,7 +27,7 @@ struct None
 };
 
 bool received_sigint = false;
-constexpr bool debug = false;
+constexpr bool debug = true;
 
 void signal_handler(int signal_number)
 {
@@ -65,7 +65,8 @@ void message_sender(Channel<Message> &outgoing_messages, Socket &socket, Channel
         {
             Message msg = msg_maybe.value();
             string data = msg.encode();
-            if (debug) {
+            if (debug)
+            {
                 cout << "sending: " << message_type_to_string(msg.get_message_type()) << endl;
             }
 
@@ -144,7 +145,8 @@ void message_receiver(Channel<Message> &incoming_messages, Socket &socket, Chann
 
         Datagram datagram = datagram_option.value();
         Message message = Message::decode(datagram.data);
-        if (debug) {
+        if (debug)
+        {
             cout << "received: " << message_type_to_string(message.get_message_type()) << endl;
         }
         incoming_messages.send(message);
@@ -195,9 +197,12 @@ void interface_subservice(ProgramState &state, Channel<None> &running)
     ParticipantTable previous_table = state.clone_participants();
     StationState previous_state = state.get_state();
 
-    if (debug) {
+    if (debug)
+    {
         cout << "state: " << station_state_to_string(state.get_state()) << endl;
-    } else {
+    }
+    else
+    {
         system("clear");
         state.print_state();
     }
@@ -209,9 +214,12 @@ void interface_subservice(ProgramState &state, Channel<None> &running)
             previous_table = state.clone_participants();
             previous_state = state.get_state();
 
-            if (debug) {
+            if (debug)
+            {
                 cout << "state: " << station_state_to_string(state.get_state()) << endl;
-            } else {
+            }
+            else
+            {
                 system("clear");
                 state.print_state();
             }
@@ -241,7 +249,8 @@ int main(int argc, char *argv[])
     threads.push_back(thread(message_receiver, ref(incoming_messages), ref(socket), ref(running)));
     threads.push_back(thread(message_sender, ref(outgoing_messages), ref(socket), ref(running)));
     threads.push_back(thread(interface_subservice, ref(state), ref(running)));
-    if (!debug) {
+    if (!debug)
+    {
         threads.push_back(thread(graceful_shutdown, ref(state), ref(outgoing_messages), ref(running)));
     }
 

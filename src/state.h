@@ -35,6 +35,8 @@ class ProgramState
     void _start_election();
     void _start_management();
 
+    void _handle_election_ping(Channel<Message> &outgoing_messages, Message election_ping_message);
+
   public:
     ProgramState();
 

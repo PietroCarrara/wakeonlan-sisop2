@@ -248,10 +248,10 @@ void ProgramState::run_election(Channel<Message> &incoming_messages, Channel<Mes
                 case MessageType::IAmTheManager:
                     _found_manager(message.value());
                     return;
-                // If someone is lost and want a new election, just shut them up
+                // If someone is lost and want a new election, maybe shut them up
                 case MessageType::ElectionPing:
                     _handle_election_ping(outgoing_messages, message.value());
-                    return;
+                    break;
                 // Higher council will decide the winner for us, wait for the results by searching for the manager
                 case MessageType::ElectionPong:
                     search_for_manager(incoming_messages, outgoing_messages);
@@ -311,15 +311,15 @@ void ProgramState::manage(Channel<Message> &incoming_messages, Channel<Message> 
                 break;
             }
             case MessageType::IAmTheManager: {
-                // someone challenged our role, let's fight!
-                _start_election();
-                break;
+                // someone challenged our role, let's not fight! :c
+                _found_manager(message.value());
+                return;
             }
             case MessageType::ElectionPing: {
                 // Something it's not right... why an election? Let's resolve this issue
                 _handle_election_ping(outgoing_messages, message.value());
                 _start_election();
-                break;
+                return;
             }
             case MessageType::HeartbeatRequest: {
                 // someone took our job!

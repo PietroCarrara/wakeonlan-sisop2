@@ -280,7 +280,7 @@ vector<Participant> ParticipantTable::deserialize(string data)
 
     for (auto participant : participants_tokens)
     {
-        vector<string> tokens = StringExtensions::split(data, ',');
+        vector<string> tokens = StringExtensions::split(participant, ',');
 
         long id = stol(tokens[0]);
         auto last_time_seen_alive = time_point_from_string(tokens[1]);

@@ -34,6 +34,7 @@ class ProgramState
     void _found_manager(Message i_am_the_manager_message);
     void _start_election();
     void _start_management();
+    void _search_for_manager();
 
     void _handle_election_ping(Channel<Message> &outgoing_messages, Message election_ping_message);
 

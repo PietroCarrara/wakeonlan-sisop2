@@ -49,6 +49,7 @@ void ProgramState::_handle_election_ping(Channel<Message> &outgoing_messages, Me
     if (table_version < ping_table_version)
     {
         // someone has a newer table, so we cant be the manager :C
+        _search_for_manager();
         return;
     }
 
@@ -59,6 +60,7 @@ void ProgramState::_handle_election_ping(Channel<Message> &outgoing_messages, Me
         if (sender_id < _id)
         {
             // someone is older than us, so we cant be the manager :c
+            _search_for_manager();
             return;
         }
     }
@@ -98,6 +100,11 @@ void ProgramState::_start_election()
     _stationState.with([&](StationState &state) { state = StationState::InElection; });
 }
 
+void ProgramState::_search_for_manager()
+{
+    _stationState.with([&](StationState &state) { state = StationState::SearchingManager; });
+}
+
 // State methods
 StationState ProgramState::get_state()
 {
@@ -108,7 +115,7 @@ void ProgramState::search_for_manager(Channel<Message> &incoming_messages, Chann
 {
     auto start = chrono::system_clock::now();
 
-    while (chrono::system_clock::now() - start < 3s && incoming_messages.is_open())
+    while (chrono::system_clock::now() - start < 5s && incoming_messages.is_open())
     {
         Message search_message(MessageType::LookingForManager, _ip_address, "255.255.255.255", _mac_address,
                                "FF:FF:FF:FF:FF:FF", _hostname, SEND_PORT, _id);
@@ -146,7 +153,7 @@ void ProgramState::be_managed(Channel<Message> &incoming_messages, Channel<Messa
 
     auto last_message_sent_from_manager = chrono::system_clock::now();
 
-    while (chrono::system_clock::now() - start < 5s)
+    while (chrono::system_clock::now() - start < 3s)
     {
         optional<Message> message = incoming_messages.receive();
 
@@ -205,9 +212,9 @@ void ProgramState::be_managed(Channel<Message> &incoming_messages, Channel<Messa
         }
     }
 
-    if (chrono::system_clock::now() - last_message_sent_from_manager > 5s)
+    if (chrono::system_clock::now() - last_message_sent_from_manager > 3s)
     {
-        // If 5 seconds have passed without a ping, manager is missing
+        // If 3 seconds have passed without a ping, manager is missing
         _start_election();
     }
 }
@@ -233,7 +240,7 @@ void ProgramState::run_election(Channel<Message> &incoming_messages, Channel<Mes
     }
 
     auto start = chrono::system_clock::now();
-    while (chrono::system_clock::now() - start < 5s)
+    while (chrono::system_clock::now() - start < 3s)
     {
         // Wait pong from others
         auto attemtp_start = chrono::system_clock::now();

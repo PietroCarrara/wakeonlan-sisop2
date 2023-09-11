@@ -17,7 +17,7 @@
 #include <vector>
 
 typedef uint16_t Port;
-constexpr size_t BUFFER_SIZE = 256;
+constexpr size_t BUFFER_SIZE = 1024 * 1024;
 
 using namespace std;
 

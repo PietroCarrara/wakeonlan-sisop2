@@ -27,7 +27,7 @@ struct None
 };
 
 bool received_sigint = false;
-constexpr bool debug = true;
+constexpr bool debug = false;
 
 void signal_handler(int signal_number)
 {

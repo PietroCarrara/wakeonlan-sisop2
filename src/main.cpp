@@ -29,6 +29,15 @@ struct None
 bool received_sigint = false;
 constexpr bool debug = false;
 
+void exit(ProgramState &state, Channel<Message> &outgoing_messages, Channel<None> &running)
+{
+    if (state.get_state() != StationState::Managing && state.get_state() != StationState::SearchingManager)
+    {
+        state.send_exit_request(outgoing_messages);
+    }
+    running.close();
+}
+
 void signal_handler(int signal_number)
 {
     received_sigint = true;
@@ -38,30 +47,21 @@ void graceful_shutdown(ProgramState &state, Channel<Message> &outgoing_messages,
 {
     signal(SIGINT, signal_handler);
 
-    while (running.is_open())
+    while (running.is_open() && !received_sigint)
     {
-        if (received_sigint)
-            break;
     }
 
     if (running.is_open())
     {
-        if (state.get_state() != StationState::Managing && state.get_state() != StationState::SearchingManager)
-        {
-            state.send_exit_request(outgoing_messages);
-        }
-        else
-        {
-            running.close();
-        }
+        exit(state, outgoing_messages, running);
     }
 }
 
-void message_sender(Channel<Message> &outgoing_messages, Socket &socket, Channel<None> &running)
+void message_sender(ProgramState &state, Channel<Message> &outgoing_messages, Socket &socket, Channel<None> &running)
 {
     while (running.is_open())
     {
-        if (optional<Message> msg_maybe = outgoing_messages.receive())
+        while (optional<Message> msg_maybe = outgoing_messages.receive())
         {
             Message msg = msg_maybe.value();
             string data = msg.encode();
@@ -91,11 +91,7 @@ void message_sender(Channel<Message> &outgoing_messages, Socket &socket, Channel
                 }
                 if (i == 10)
                 {
-                    cout << endl << "Unable to signal your exit to the manager, try again" << endl;
-                }
-                else
-                {
-                    running.close();
+                    cout << endl << "Unable to signal your exit to the manager..." << endl;
                 }
                 break;
             default:
@@ -176,14 +172,7 @@ void command_subservice(ProgramState &state, Channel<Message> &outgoing_messages
         }
         else if (command == "EXIT" || cin.eof())
         {
-            if (state.get_state() != StationState::Managing && state.get_state() != StationState::SearchingManager)
-            {
-                state.send_exit_request(outgoing_messages);
-            }
-            else
-            {
-                running.close();
-            }
+            exit(state, outgoing_messages, running);
         }
         else
         {
@@ -247,12 +236,11 @@ int main(int argc, char *argv[])
 
     // Spawn threads
     threads.push_back(thread(message_receiver, ref(incoming_messages), ref(socket), ref(running)));
-    threads.push_back(thread(message_sender, ref(outgoing_messages), ref(socket), ref(running)));
+    threads.push_back(thread(message_sender, ref(state), ref(outgoing_messages), ref(socket), ref(running)));
     threads.push_back(thread(interface_subservice, ref(state), ref(running)));
-    if (!debug)
-    {
-        threads.push_back(thread(graceful_shutdown, ref(state), ref(outgoing_messages), ref(running)));
-    }
+    threads.push_back(thread(graceful_shutdown, ref(state), ref(outgoing_messages), ref(running)));
+    threads.push_back(thread(graceful_shutdown, ref(state), ref(outgoing_messages), ref(running)));
+    threads.push_back(thread(graceful_shutdown, ref(state), ref(outgoing_messages), ref(running)));
 
     detach_threads.push_back(thread(command_subservice, ref(state), ref(outgoing_messages), ref(running)));
 

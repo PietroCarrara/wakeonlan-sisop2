@@ -31,13 +31,7 @@ template <typename T> class Channel
     {
         lock.acquire();
 
-        if (!open)
-        {
-            return {};
-        }
-
         optional<T> result = {};
-
         if (data.size() > 0)
         {
             result = data.front();
@@ -53,7 +47,6 @@ template <typename T> class Channel
         lock.acquire();
 
         open = false;
-        data.clear();
 
         lock.release();
     }

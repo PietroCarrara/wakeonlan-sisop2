@@ -481,7 +481,7 @@ void ProgramState::send_exit_request(Channel<Message> &messages)
     }
     else
     {
-        cout << "Manager could not be found, exiting aborted!" << endl;
+        cout << "Manager could not be found!" << endl;
     }
 }
 
